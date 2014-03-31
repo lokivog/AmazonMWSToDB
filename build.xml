@@ -1,0 +1,86 @@
+<project name="AmazonMWSToDB" default="startdb" basedir=".">
+  <property file="build.properties" />
+
+    <!-- Global properties for this build. -->
+    <property name="database.dir" value="database" />
+    <property name="lib.dir" value="lib" />
+
+    <!-- Classpath declaration. -->
+    <path id="lib.class.path">
+        <fileset dir="${lib.dir}">
+            <include name="**/*.jar" />
+        </fileset>
+    </path>
+
+    <!-- Start the HSQL DB server -->
+    <target name="startdb" description="Run HSQL database server with clean DB">
+        <!-- Delete database files -->
+        <delete dir="${database.dir}" />
+        <java classname="org.hsqldb.Server" fork="yes" classpathref="lib.class.path" failonerror="true">
+            <arg value="-database.0" />
+            <arg value="file:${database.dir}/db" />
+        </java>
+    </target>
+
+    <!-- Start the HSQL DB browser tool -->
+    <target name="startManager" description="Start HSQL DB manager">
+        <java classname="org.hsqldb.util.DatabaseManagerSwing" fork="yes" classpathref="lib.class.path" failonerror="true">
+            <arg value="-url" />
+            <arg value="${db.url}" />
+            <arg value="-driver" />
+            <arg value="${db.driver}" />
+        </java>
+    </target>
+
+    <!-- Stop the HSQL DB server -->
+    <target name="stopdb" description="Stop HSQL database server">
+        <sql driver="${db.driver}" url="${db.url}" userid="${db.user}" password="${db.pw}" onerror="continue">
+            <classpath refid="lib.class.path" />
+            SHUTDOWN;
+        </sql>
+    </target>
+
+    <target name="createTables">
+        <echo message="CREATE TABLES USING: ${db.driver} ${db.url}" />
+        <sql driver="${db.driver}" url="${db.url}" userid="${db.user}" password="${db.pw}" onerror="continue">
+            <classpath refid="lib.class.path" />
+            CREATE TABLE SALARIATII(
+                CNP INTEGER NOT NULL PRIMARY KEY,
+                NUME VARCHAR(40) NOT NULL,
+                SALAR INTEGER NOT NULL,
+                GRADDIDACTIC VARCHAR(256) NOT NULL,
+                DATANASTERII VARCHAR(40) NOT NULL
+            );
+            </sql>
+    </target>
+
+    <target name="dropTables">
+        <echo message="DROP TABLES USING: ${db.driver} ${db.url}" />
+        <sql driver="${db.driver}" url="${db.url}" userid="${db.user}" password="${db.pw}" onerror="continue">
+            DROP TABLE SALARIATII;
+            <classpath refid="lib.class.path" />
+         </sql>
+    </target>
+
+    <target name="emptyTables">
+        <echo message="USING: ${db.driver} ${db.url}" />
+        <sql driver="${db.driver}" url="${db.url}" userid="${db.user}" password="${db.pw}">
+            <classpath refid="lib.class.path" />
+            DELETE FROM SALARIATII;
+        </sql>
+    </target>
+
+
+    <target name="populateTables">
+        <echo message="USING: ${db.driver} ${db.url}" />
+        <sql driver="${db.driver}" url="${db.url}" userid="${db.user}" password="${db.pw}">
+            <classpath refid="lib.class.path" />
+            INSERT INTO SALARIATII(CNP, NUME,SALAR,GRADDIDACTIC,DATANASTERII) VALUES ( 1,'FLORIN BOIAN',2500,'PROFESOR', '07/08/1950');
+
+        </sql>
+
+    </target>
+
+    <target name="all" depends="dropTables,createTables,emptyTables,populateTables" />
+
+</project>
