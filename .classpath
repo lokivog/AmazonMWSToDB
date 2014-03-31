@@ -5,5 +5,7 @@
 	<classpathentry combineaccessrules="false" kind="src" path="/amazon"/>
 	<classpathentry kind="lib" path="lib/json.jar"/>
 	<classpathentry kind="lib" path="lib/hsqldb.jar"/>
+	<classpathentry kind="lib" path="lib/slf4j-simple-1.7.6.jar"/>
+	<classpathentry kind="lib" path="lib/slf4j-api-1.7.6.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
