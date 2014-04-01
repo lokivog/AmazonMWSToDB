@@ -7,5 +7,7 @@
 	<classpathentry kind="lib" path="lib/hsqldb.jar"/>
 	<classpathentry kind="lib" path="lib/slf4j-simple-1.7.6.jar"/>
 	<classpathentry kind="lib" path="lib/slf4j-api-1.7.6.jar"/>
+	<classpathentry kind="lib" path="lib/simpleorm-dataset.jar"/>
+	<classpathentry kind="lib" path="lib/simpleorm-sessionJdbc.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

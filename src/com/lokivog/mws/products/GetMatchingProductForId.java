@@ -4,7 +4,9 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -67,7 +69,7 @@ public class GetMatchingProductForId {
 		mProductIds = pProductIds;
 	}
 
-	public GetMatchingProductForIdResponse matchProducts() {
+	public JSONArray matchProducts() {
 		MarketplaceWebServiceProducts service;
 		boolean mock = false;
 		if (mock) {
@@ -88,10 +90,11 @@ public class GetMatchingProductForId {
 		idListType.setId(mProductIds);
 		request.setIdList(idListType);
 		request.setIdType("UPC");
-		GetMatchingProductForIdResponse response = null;
+		// GetMatchingProductForIdResponse response = null;
+		JSONArray response = null;
 		try {
 			response = invokeGetMatchingProductForId(service, request);
-			generateElasticSearchJson(response);
+			// generateElasticSearchJson(response);
 		} catch (Exception e) {
 			logger.error("exception connection to elasticsearch", e);
 		}
@@ -113,10 +116,10 @@ public class GetMatchingProductForId {
 	}
 
 	public void test() {
-		GetMatchingProductForIdResponse response = matchProducts();
-		List<GetMatchingProductForIdResult> matchingProductForIdResultList = response
-				.getGetMatchingProductForIdResult();
-		logger.info(response.toJSON());
+		matchProducts();
+		// List<GetMatchingProductForIdResult> matchingProductForIdResultList = response
+		// .getGetMatchingProductForIdResult();
+		// logger.info(response.toJSON());
 		// JSONObject object = new JSONObject(response.toJSON());
 		// JSONObject jsonResponse = object.getJSONObject("GetMatchingProductForIdResponse");
 		// JSONArray jsonResult = jsonResponse.getJSONArray("GetMatchingProductForIdResult");
@@ -146,21 +149,24 @@ public class GetMatchingProductForId {
 	 * @param request
 	 *            Action to invoke
 	 */
-	public GetMatchingProductForIdResponse invokeGetMatchingProductForId(MarketplaceWebServiceProducts service,
+	public JSONArray invokeGetMatchingProductForId(MarketplaceWebServiceProducts service,
 			GetMatchingProductForIdRequest request) {
 		GetMatchingProductForIdResponse response = null;
 		PrintWriter printWriter = null;
+
+		JSONArray productArray = new JSONArray();
 		try {
 			printWriter = new PrintWriter(new File("output/matchingProductForId"));
 			response = service.getMatchingProductForId(request);
 			logger.debug("GetMatchingProductForId Action Response");
 			List<GetMatchingProductForIdResult> getMatchingProductForIdResultList = response
 					.getGetMatchingProductForIdResult();
-			JSONObject object = new JSONObject();
+			logger.info("response: \n" + response.toXML());
 			// Iterates over the Amazon response and builds a json object from the xml response.
 			// This doesn't set all the properties from the xml schema object but it does contain place holders to set them in the future
 			// if needed
 			for (GetMatchingProductForIdResult getMatchingProductForIdResult : getMatchingProductForIdResultList) {
+				JSONObject object = new JSONObject();
 				if (getMatchingProductForIdResult.isSetId()) {
 					object.put("id", getMatchingProductForIdResult.getId());
 				}
@@ -176,8 +182,10 @@ public class GetMatchingProductForId {
 					java.util.List<Product> productList = products.getProduct();
 					for (Product product : productList) {
 						JSONObject jsonProduct = new JSONObject();
+
 						if (product.isSetIdentifiers()) {
 							IdentifierType identifiers = product.getIdentifiers();
+
 							if (identifiers.isSetMarketplaceASIN()) {
 								ASINIdentifier marketplaceASIN = identifiers.getMarketplaceASIN();
 								if (marketplaceASIN.isSetMarketplaceId()) {
@@ -198,6 +206,7 @@ public class GetMatchingProductForId {
 									jsonProduct.put("sellerSKU", SKUIdentifier.getSellerSKU());
 								}
 							}
+
 						}
 						if (product.isSetAttributeSets()) {
 							AttributeSetList attributeSetList = product.getAttributeSets();
@@ -226,6 +235,7 @@ public class GetMatchingProductForId {
 								CompetitivePriceList competitivePrices = competitivePricing.getCompetitivePrices();
 								java.util.List<CompetitivePriceType> competitivePriceList = competitivePrices
 										.getCompetitivePrice();
+								logger.info("competitivePriceList: " + competitivePriceList);
 								for (CompetitivePriceType competitivePrice : competitivePriceList) {
 									if (competitivePrice.isSetCondition()) {
 									}
@@ -398,13 +408,16 @@ public class GetMatchingProductForId {
 					}
 					object.put("products", array);
 					printWriter.println(object.toString());
-					logger.info("jsonProduct: " + object);
+					// processJSON(object);
+					// insertJSONIntoDB(object);
+					// logger.info("jsonProduct: " + object);
 				}
 				if (getMatchingProductForIdResult.isSetError()) {
 					com.amazonservices.mws.products.model.Error error = getMatchingProductForIdResult.getError();
 					logger.warn("Amazon Response Error - Type: {}, Code: {}, Message: {}", error.getType(),
 							error.getCode(), error.getMessage());
 				}
+				productArray.put(object);
 			}
 			if (response.isSetResponseMetadata()) {
 				ResponseMetadata responseMetadata = response.getResponseMetadata();
@@ -428,6 +441,50 @@ public class GetMatchingProductForId {
 				printWriter.close();
 			}
 		}
-		return response;
+		return productArray;
+	}
+
+	private Set<String> allNames = new HashSet<String>();
+
+	public void processJSON(JSONObject pObject) {
+		JSONArray names = pObject.names();
+		logger.info("names: " + names);
+		JSONArray products = pObject.getJSONArray("products");
+		int size = products.length();
+
+		for (int i = 0; i < size; i++) {
+			JSONObject obj = products.getJSONObject(i);
+			JSONArray prodNames = obj.names();
+			int prodSize = prodNames.length();
+			for (int j = 0; j < prodSize; j++) {
+				String name = prodNames.getString(j).toUpperCase();
+				String field = String.format(
+						"public static final SFieldString %s = new SFieldString(PRODUCT, \"%s\", 40);", name, name);
+				allNames.add(field + "\n");
+			}
+
+		}
+		logger.info("prodNames: " + allNames);
+	}
+
+	public void insertJSONIntoDB(JSONObject pObject) {
+		JSONArray names = pObject.names();
+		logger.info("names: " + names);
+		JSONArray products = pObject.getJSONArray("products");
+		int size = products.length();
+
+		for (int i = 0; i < size; i++) {
+			JSONObject obj = products.getJSONObject(i);
+			JSONArray prodNames = obj.names();
+
+			int prodSize = prodNames.length();
+			for (int j = 0; j < prodSize; j++) {
+				String name = prodNames.getString(j);
+				logger.info(name + ":" + obj.getString(name));
+				// allNames.add(name.toLowerCase() + " " + "VARCHAR(40)");
+			}
+
+		}
+		logger.info("prodNames: " + allNames);
 	}
 }

@@ -101,9 +101,10 @@ public class DBManager {
 		for (; rs.next();) {
 			for (i = 0; i < colmax; ++i) {
 				o = rs.getObject(i + 1); // Is SQL the first column is indexed
-
-				// with 1 not 0
-				System.out.print(o.toString() + " ");
+				if (o != null) {
+					// with 1 not 0
+					System.out.print(o.toString() + " ");
+				}
 			}
 
 			System.out.println(" ");
@@ -115,7 +116,8 @@ public class DBManager {
 		DBManager db = null;
 
 		try {
-			db = new DBManager("mem:mymemdb");
+			// db = new DBManager("mem:mymemdb");
+			db = new DBManager("hsqlTempFiles");
 		} catch (Exception ex1) {
 			ex1.printStackTrace(); // could not start db
 
@@ -128,7 +130,9 @@ public class DBManager {
 			//
 			// by declaring the id column IDENTITY, the db will automatically
 			// generate unique values for new rows- useful for row keys
-			db.update("CREATE TABLE sample_table ( id INTEGER IDENTITY, str_col VARCHAR(256), num_col INTEGER)");
+			if (false) {
+				db.update("CREATE TABLE sample_table ( id INTEGER IDENTITY, binding VARCHAR(40), productgroup VARCHAR(40), materialtype VARCHAR(40), packagequantity VARCHAR(40), title VARCHAR(40), asin VARCHAR(40), feature VARCHAR(40), color VARCHAR(40), listprice VARCHAR(40), producttypename VARCHAR(40), marketplaceid VARCHAR(40), partnumber VARCHAR(40), packagedimensions VARCHAR(40), brand VARCHAR(40), smallimage VARCHAR(40), size VARCHAR(40), studio VARCHAR(40), model VARCHAR(40), itemdimensions VARCHAR(40), publisher VARCHAR(40), manufacturer VARCHAR(40), label VARCHAR(40), numberofitems VARCHAR(40))");
+			}
 		} catch (SQLException ex2) {
 
 			// ignore
@@ -143,13 +147,13 @@ public class DBManager {
 
 			// add some rows - will create duplicates if run more then once
 			// the id column is automatically generated
-			db.update("INSERT INTO sample_table(str_col,num_col) VALUES('Ford', 100)");
-			db.update("INSERT INTO sample_table(str_col,num_col) VALUES('Toyota', 200)");
-			db.update("INSERT INTO sample_table(str_col,num_col) VALUES('Honda', 300)");
-			db.update("INSERT INTO sample_table(str_col,num_col) VALUES('GM', 400)");
+			// db.update("INSERT INTO sample_table(brand,studio) VALUES('Micro World', 'Micro World')");
+			// db.update("INSERT INTO sample_table(brand,studio) VALUES('bulk buys', 'Kole Imports')");
+			// db.update("INSERT INTO sample_table(str_col,num_col) VALUES('Honda', 300)");
+			// db.update("INSERT INTO sample_table(str_col,num_col) VALUES('GM', 400)");
 
 			// do a query
-			db.query("SELECT * FROM sample_table WHERE num_col < 250");
+			db.query("SELECT * FROM XX_PRODUCT");
 
 			// at end of program
 			db.shutdown();
