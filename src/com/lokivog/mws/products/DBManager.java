@@ -19,7 +19,7 @@ public class DBManager {
 		// Load the HSQL Database Engine JDBC driver
 		// hsqldb.jar should be in the class path or made part of the current
 		// jar
-		Class.forName("org.hsqldb.jdbcDriver");
+		// Class.forName("org.hsqldb.jdbcDriver");
 
 		// connect to the database. This will load the db files and start the
 		// database if it is not alread running.
@@ -28,9 +28,11 @@ public class DBManager {
 		// of the db.
 		// It can contain directory names relative to the
 		// current working directory
-		conn = DriverManager.getConnection("jdbc:hsqldb:" + db_file_name_prefix, // filenames
-				"sa", // username
-				""); // password
+		// conn = DriverManager.getConnection("jdbc:hsqldb:" + db_file_name_prefix, // filenames
+		// "sa", // username
+		// ""); // password
+		String url = "jdbc:postgresql://localhost/amazon";
+		conn = DriverManager.getConnection(url, "postgres", "postgres");
 	}
 
 	public void shutdown() throws SQLException {
@@ -130,7 +132,7 @@ public class DBManager {
 			//
 			// by declaring the id column IDENTITY, the db will automatically
 			// generate unique values for new rows- useful for row keys
-			if (false) {
+			if (true) {
 				db.update("CREATE TABLE sample_table ( id INTEGER IDENTITY, binding VARCHAR(40), productgroup VARCHAR(40), materialtype VARCHAR(40), packagequantity VARCHAR(40), title VARCHAR(40), asin VARCHAR(40), feature VARCHAR(40), color VARCHAR(40), listprice VARCHAR(40), producttypename VARCHAR(40), marketplaceid VARCHAR(40), partnumber VARCHAR(40), packagedimensions VARCHAR(40), brand VARCHAR(40), smallimage VARCHAR(40), size VARCHAR(40), studio VARCHAR(40), model VARCHAR(40), itemdimensions VARCHAR(40), publisher VARCHAR(40), manufacturer VARCHAR(40), label VARCHAR(40), numberofitems VARCHAR(40))");
 			}
 		} catch (SQLException ex2) {
@@ -153,7 +155,7 @@ public class DBManager {
 			// db.update("INSERT INTO sample_table(str_col,num_col) VALUES('GM', 400)");
 
 			// do a query
-			db.query("SELECT * FROM XX_PRODUCT");
+			db.query("SELECT * FROM sample_table");
 
 			// at end of program
 			db.shutdown();

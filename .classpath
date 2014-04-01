@@ -1,13 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
 	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="src" path="resources"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/amazon"/>
 	<classpathentry kind="lib" path="lib/json.jar"/>
 	<classpathentry kind="lib" path="lib/hsqldb.jar"/>
-	<classpathentry kind="lib" path="lib/slf4j-simple-1.7.6.jar"/>
 	<classpathentry kind="lib" path="lib/slf4j-api-1.7.6.jar"/>
 	<classpathentry kind="lib" path="lib/simpleorm-dataset.jar"/>
 	<classpathentry kind="lib" path="lib/simpleorm-sessionJdbc.jar"/>
+	<classpathentry kind="lib" path="lib/logback-classic-1.1.1.jar"/>
+	<classpathentry kind="lib" path="lib/logback-core-1.1.1.jar"/>
+	<classpathentry kind="lib" path="lib/commons-lang3-3.3.1.jar"/>
+	<classpathentry kind="lib" path="lib/postgresql-9.1-903.jdbc4.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

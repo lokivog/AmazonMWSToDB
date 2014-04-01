@@ -3,30 +3,93 @@ package com.lokivog.mws.products;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import simpleorm.utils.SLog;
+
+/**
+ * The Class ProductScheduler is the main class to run for retrieving products from Amazon.
+ */
 public class ProductScheduler {
 
-	public static final String DROP_SHIP_SOURCE = "koleimports";
+	final Logger logger = LoggerFactory.getLogger(ProductScheduler.class);
 
-	public static void main(String[] args) {
+	public void testSplit() {
+		List<String> ids = new ArrayList<String>();
+		ids.add("731015110643");
+		ids.add("731015110650");
+		// ids.add("731015110704");
+		// ids.add("731015110810");
+		List<List> subLists = split(ids, 1);
+		int count = 1;
+		for (List subList : subLists) {
+			logger.info("list: {}, size: {}", count++, subList.size());
+		}
+	}
+
+	public void run() {
 		ProductManager pm = null;
 		try {
-			pm = new ProductManager();
-			// pm.dropProductTable();
-			// pm.createProductTable();
-			// pm.printQueryResults();
-			List<DropShipProduct> ids = new ArrayList<DropShipProduct>();
+			pm = new ProductManager(ProductScheduler.class.getSimpleName(), Constants.DROP_SHIP_SOURCE_kOLE);
+			SLog.getSessionlessLogger().setLevel(0);
+			// SLog.setSlogClass(SLogSlf4j.class);
 
-			ids.add(new DropShipProduct("603076897309", DROP_SHIP_SOURCE));
-			// ids.add(new DropShipProduct("731015006625", DROP_SHIP_SOURCE));
-			// ids.add(new DropShipProduct("731015006724", DROP_SHIP_SOURCE));
-			// ids.add(new DropShipProduct("731015023950", DROP_SHIP_SOURCE));
-			// ids.add(new DropShipProduct("731015004560", DROP_SHIP_SOURCE));
-			pm.findAndInsertProducts(ids);
+			pm.dropTables();
+			pm.createTables();
+			// pm.printQueryResults();
+			List<String> ids = new ArrayList<String>();
+			ids.add("73101511064323433");
+			ids.add("731015110650");
+			ids.add("731015110704");
+			// ids.add("731015110810");
+			boolean update = false;
+			List<List<String>> subLists = split(ids, Constants.MAX_PRODUCT_LOOKUP_SIZE);
+			for (List<String> subList : subLists) {
+				pm.findAndInsertProducts(subList, update);
+			}
+			// ids.add("731015109036");
+
 		} finally {
 			if (pm != null) {
 				pm.shutdownDB();
 			}
 		}
+
+	}
+
+	/**
+	 * Splits a list into multiple sub lists.
+	 * 
+	 * @param list
+	 *            the list
+	 * @param i
+	 *            the i
+	 * @return the list
+	 */
+	private List split(List list, int i) {
+		List<List<String>> out = new ArrayList<List<String>>();
+		int size = list.size();
+		int number = size / i;
+		int remain = size % i;
+		if (remain != 0) {
+			number++;
+		}
+		for (int j = 0; j < number; j++) {
+			int start = j * i;
+			int end = start + i;
+			if (end > list.size()) {
+				end = list.size();
+			}
+			out.add(list.subList(start, end));
+		}
+		return out;
+	}
+
+	public static void main(String[] args) {
+		ProductScheduler scheduler = new ProductScheduler();
+		scheduler.run();
+		// scheduler.testSplit();
 	}
 
 	public List<String> getProductIds() {
@@ -64,4 +127,5 @@ public class ProductScheduler {
 		ids.add("731015109463");
 		return ids;
 	}
+
 }

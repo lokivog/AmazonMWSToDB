@@ -1,18 +1,23 @@
 package com.lokivog.mws.products;
 
+import static com.lokivog.mws.products.Constants.FEATURE;
+
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.commons.lang3.StringUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
@@ -57,16 +62,19 @@ import com.amazonservices.mws.products.samples.ProductsConfig;
  */
 public class GetMatchingProductForId {
 
+	public static final String OUTPUT_DIR = "output";
+
 	final Logger logger = LoggerFactory.getLogger(GetMatchingProductForId.class);
 
 	private List<String> mProductIds;
 
 	public GetMatchingProductForId(String pId) {
-
+		createOutputDir();
 	}
 
 	public GetMatchingProductForId(List<String> pProductIds) {
 		mProductIds = pProductIds;
+		createOutputDir();
 	}
 
 	public JSONArray matchProducts() {
@@ -88,9 +96,9 @@ public class GetMatchingProductForId {
 		request.setMarketplaceId(ProductsConfig.marketplaceId);
 		IdListType idListType = new IdListType();
 		idListType.setId(mProductIds);
+		logger.info("Looking up UPC products: {}", mProductIds);
 		request.setIdList(idListType);
 		request.setIdType("UPC");
-		// GetMatchingProductForIdResponse response = null;
 		JSONArray response = null;
 		try {
 			response = invokeGetMatchingProductForId(service, request);
@@ -99,6 +107,19 @@ public class GetMatchingProductForId {
 			logger.error("exception connection to elasticsearch", e);
 		}
 		return response;
+	}
+
+	private void createOutputDir() {
+		File theDir = new File(OUTPUT_DIR);
+
+		// if the directory does not exist, create it
+		if (!theDir.exists()) {
+			logger.info("creating directory: {} ", OUTPUT_DIR);
+			boolean result = theDir.mkdir();
+			if (result) {
+				logger.info("{} created", OUTPUT_DIR);
+			}
+		}
 	}
 
 	/**
@@ -156,25 +177,25 @@ public class GetMatchingProductForId {
 
 		JSONArray productArray = new JSONArray();
 		try {
-			printWriter = new PrintWriter(new File("output/matchingProductForId"));
+			printWriter = new PrintWriter(new BufferedWriter(new FileWriter(OUTPUT_DIR + "/amazonproducts.json", true)));
 			response = service.getMatchingProductForId(request);
 			logger.debug("GetMatchingProductForId Action Response");
 			List<GetMatchingProductForIdResult> getMatchingProductForIdResultList = response
 					.getGetMatchingProductForIdResult();
-			logger.info("response: \n" + response.toXML());
+			// logger.info("response: \n" + response.toXML());
 			// Iterates over the Amazon response and builds a json object from the xml response.
 			// This doesn't set all the properties from the xml schema object but it does contain place holders to set them in the future
 			// if needed
 			for (GetMatchingProductForIdResult getMatchingProductForIdResult : getMatchingProductForIdResultList) {
 				JSONObject object = new JSONObject();
 				if (getMatchingProductForIdResult.isSetId()) {
-					object.put("id", getMatchingProductForIdResult.getId());
+					object.put(Constants.UPC, getMatchingProductForIdResult.getId());
 				}
 				if (getMatchingProductForIdResult.isSetIdType()) {
-					object.put("idType", getMatchingProductForIdResult.getIdType());
+					object.put(Constants.ID_TYPE, getMatchingProductForIdResult.getIdType());
 				}
 				if (getMatchingProductForIdResult.isSetStatus()) {
-					object.put("status", getMatchingProductForIdResult.getStatus());
+					object.put(Constants.STATUS, getMatchingProductForIdResult.getStatus());
 				}
 				if (getMatchingProductForIdResult.isSetProducts()) {
 					ProductList products = getMatchingProductForIdResult.getProducts();
@@ -189,10 +210,10 @@ public class GetMatchingProductForId {
 							if (identifiers.isSetMarketplaceASIN()) {
 								ASINIdentifier marketplaceASIN = identifiers.getMarketplaceASIN();
 								if (marketplaceASIN.isSetMarketplaceId()) {
-									jsonProduct.put("marketplaceId", marketplaceASIN.getMarketplaceId());
+									jsonProduct.put(Constants.MARKET_PLACE_ID, marketplaceASIN.getMarketplaceId());
 								}
 								if (marketplaceASIN.isSetASIN()) {
-									jsonProduct.put("asin", marketplaceASIN.getASIN());
+									jsonProduct.put(Constants.ASIN, marketplaceASIN.getASIN());
 								}
 							}
 							if (identifiers.isSetSKUIdentifier()) {
@@ -216,10 +237,36 @@ public class GetMatchingProductForId {
 								for (int i = 0; i < nodeList.getLength(); i++) {
 									String nodeName = nodeList.item(i).getNodeName();
 									nodeName = nodeName.replaceFirst("ns2:", "");
-									jsonProduct.put(nodeName, nodeList.item(i).getTextContent());
+									Node myNode = nodeList.item(i);
+
+									if (nodeName.equals(FEATURE)) {
+										if (jsonProduct.has(nodeName)) {
+											String feature = jsonProduct.getString(nodeName);
+											feature = feature + ", " + nodeList.item(i).getTextContent();
+											jsonProduct.put(nodeName, feature);
+										} else {
+											jsonProduct.put(nodeName, nodeList.item(i).getTextContent());
+										}
+
+									} else if (nodeName.equals("PackageDimensions")) {
+										NodeList packageDimNodeList = myNode.getChildNodes();
+										for (int j = 0; j < packageDimNodeList.getLength(); j++) {
+											Node packageDimNode = packageDimNodeList.item(j);
+											if (!StringUtils.isEmpty(packageDimNode.getTextContent())) {
+												String packageDimName = packageDimNode.getNodeName();
+												packageDimName = packageDimName.replaceFirst("ns2:", "");
+												jsonProduct.put("Package" + packageDimName,
+														packageDimNode.getTextContent());
+											}
+
+										}
+										jsonProduct.put(nodeName, nodeList.item(i).getTextContent());
+									} else {
+										jsonProduct.put(nodeName, nodeList.item(i).getTextContent());
+									}
+									// logger.info("nodeName: {}={}", nodeName, nodeList.item(i).getTextContent());
 
 								}
-								NamedNodeMap attributes = attribute.getAttributes();
 							}
 						}
 						if (product.isSetRelationships()) {
@@ -406,7 +453,7 @@ public class GetMatchingProductForId {
 						}
 						array.put(jsonProduct);
 					}
-					object.put("products", array);
+					object.put(Constants.PRODUCTS, array);
 					printWriter.println(object.toString());
 					// processJSON(object);
 					// insertJSONIntoDB(object);
@@ -436,6 +483,8 @@ public class GetMatchingProductForId {
 			logger.error("ResponseHeaderMetadata: " + ex.getResponseHeaderMetadata());
 		} catch (FileNotFoundException e) {
 			logger.error("FileNotFound", e);
+		} catch (IOException e) {
+			logger.error("IOException", e);
 		} finally {
 			if (printWriter != null) {
 				printWriter.close();

@@ -1,10 +1,19 @@
 package com.lokivog.mws.products;
 
+import static com.lokivog.mws.products.Constants.ASIN;
+import static com.lokivog.mws.products.Constants.DROP_SHIP_SOURCE_DEFAULT;
+import static com.lokivog.mws.products.Constants.FEATURE;
+import static com.lokivog.mws.products.Constants.FEATURE_LENGTH;
+import static com.lokivog.mws.products.Constants.ID_TYPE;
+import static com.lokivog.mws.products.Constants.MARKET_PLACE_ID;
+import static com.lokivog.mws.products.Constants.STATUS;
+import static com.lokivog.mws.products.Constants.STATUS_SUCCESS;
+import static com.lokivog.mws.products.Constants.UPC;
+
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Set;
 
 import org.json.JSONArray;
@@ -20,17 +29,33 @@ import simpleorm.utils.SLog;
 public class ProductManager {
 
 	public static final String DRIVER = "org.hsqldb.jdbcDriver";
-	public static final String SESSSION_NAME = "Tiny";
+	public static final String POSTGRES_DRIVER = "org.postgresql.Driver";
 	final Logger logger = LoggerFactory.getLogger(ProductManager.class);
-
 	private Connection connection;
+	private String mSessionName;
+	private String mDropShipSource;
 
-	private boolean mPurgeProducts = false;
-
-	public ProductManager() {
+	public ProductManager(String pSessionName) {
 		try {
+			setSessionName(pSessionName);
+			setDropShipSource(DROP_SHIP_SOURCE_DEFAULT);
 			Class.forName(DRIVER);
 			connection = java.sql.DriverManager.getConnection("jdbc:hsqldb:hsqlTempFiles;shutdown=true;", "sa", "");
+		} catch (SQLException e) {
+			logger.error("Error getting connection", e);
+		} catch (ClassNotFoundException e) {
+			logger.error("Driver class not found for: " + DRIVER, e);
+		}
+	}
+
+	public ProductManager(String pSessionName, String pDropShipSource) {
+		try {
+			setSessionName(pSessionName);
+			setDropShipSource(pDropShipSource);
+			Class.forName(POSTGRES_DRIVER);
+			// connection = java.sql.DriverManager.getConnection("jdbc:hsqldb:hsqlTempFiles;shutdown=true;", "sa", "");
+			String url = "jdbc:postgresql://localhost/amazon";
+			connection = java.sql.DriverManager.getConnection(url, "postgres", "postgres");
 		} catch (SQLException e) {
 			logger.error("Error getting connection", e);
 		} catch (ClassNotFoundException e) {
@@ -43,57 +68,77 @@ public class ProductManager {
 		ses.close();
 	}
 
-	public void createProductTable() {
+	public void createTables() {
 		SSessionJdbc ses = getSession();
 		ses.begin();
 		ses.rawUpdateDB(ses.getDriver().createTableSQL(Product.PRODUCT));
+		ses.rawUpdateDB(ses.getDriver().createTableSQL(ProductError.PRODUCT_ERROR));
 		ses.commit();
 	}
 
-	public void dropProductTable() {
+	public void dropTables() {
 		SSessionJdbc ses = getSession();
 		ses.begin();
-		ses.getDriver().dropTableNoError("XX_PRODUCT");
+		ses.getDriver().dropTableNoError(Constants.TABLE_PRODUCT);
+		ses.getDriver().dropTableNoError(Constants.TABLE_PRODUCT_ERROR);
 		ses.commit();
 	}
 
 	private SSessionJdbc getSession() {
 		SSessionJdbc ses = SSessionJdbc.getThreadLocalSession();
 		if (ses == null) {
-			ses = SSessionJdbc.open(connection, SESSSION_NAME);
+			ses = SSessionJdbc.open(connection, getSessionName());
 		}
 		return ses;
 	}
 
-	public void findAndInsertProducts(List<DropShipProduct> pDropShipProducts) {
-		List<String> productIds = filterExistingProducts(pDropShipProducts);
-		logger.info("product ids: " + productIds);
+	public void findAndInsertProducts(List<String> pProductUPCList, boolean pUpdate) {
+		List<String> productIds = filterExistingProducts(pProductUPCList, pUpdate);
+		logger.debug("product ids: " + productIds);
 		if (!productIds.isEmpty()) {
-			SSessionJdbc ses = getSession();
-			ses.begin();
+			boolean success = false;
+			SSessionJdbc ses = null;
 			GetMatchingProductForId matchingProducts = new GetMatchingProductForId(productIds);
 			JSONArray json = matchingProducts.matchProducts();
-			bulkInsert(json, ses);
-			ses.commit();
+			try {
+				ses = getSession();
+				ses.begin();
+				bulkInsert(json, pUpdate);
+				success = true;
+			} catch (Exception e) {
+				logger.error("Error during bulkInsert", e);
+			} finally {
+				if (ses != null) {
+					if (!success) {
+						ses.rollback();
+					} else {
+						ses.commit();
+					}
+				}
+			}
+
 		} else {
-			logger.info("No products to process from list {}", pDropShipProducts.toString());
+			logger.info("No products to process from list {}", pProductUPCList.toString());
 		}
 	}
 
-	private List<String> filterExistingProducts(List<DropShipProduct> pDropShipProducts) {
+	private List<String> filterExistingProducts(List<String> pProductUPCList, boolean pUpdate) {
 		List<String> productIds = new ArrayList<String>();
 		SSessionJdbc ses = getSession();
 		ses.begin();
-		ListIterator<DropShipProduct> iter = pDropShipProducts.listIterator();
-		while (iter.hasNext()) {
-			DropShipProduct dp = iter.next();
-			SQuery<Product> productQuery = new SQuery<Product>(Product.PRODUCT).eq(Product.UPC, dp.getUPC());
-			List<Product> products = ses.query(productQuery);
-			logger.info("products returned from query: " + products);
-			if (products.isEmpty()) {
-				productIds.add(dp.getUPC());
+		for (String upc : pProductUPCList) {
+			if (!pUpdate) {
+				SQuery<Product> productQuery = new SQuery<Product>(Product.PRODUCT).eq(Product.UPC, upc).eq(
+						Product.DROP_SHIP_SOURCE, getDropShipSource());
+				List<Product> products = ses.query(productQuery);
+				logger.debug("products returned from query: " + products);
+				if (products.isEmpty()) {
+					productIds.add(upc);
+				} else {
+					logger.info("product already exist for upc: {}, source: {}", upc, getDropShipSource());
+				}
 			} else {
-				logger.info("product already exist for id {}", dp.getUPC());
+				productIds.add(upc);
 			}
 		}
 		ses.commit();
@@ -115,59 +160,93 @@ public class ProductManager {
 		ses.commit();
 	}
 
-	private List split(List list, int i) {
-		List<List<String>> out = new ArrayList<List<String>>();
-		int size = list.size();
-		int number = size / i;
-		int remain = size % i;
-		if (remain != 0) {
-			number++;
-		}
-		for (int j = 0; j < number; j++) {
-			int start = j * i;
-			int end = start + i;
-			if (end > list.size()) {
-				end = list.size();
-			}
-			out.add(list.subList(start, end));
-		}
-		return out;
-	}
-
-	private void bulkInsert(JSONArray pJSONArray, SSessionJdbc ses) {
+	private void bulkInsert(JSONArray pJSONArray, boolean pUpdate) {
 		logger.info("pJSONArray: " + pJSONArray);
 
 		int arraySize = pJSONArray.length();
 
-		for (int a = 0; a < arraySize; a++) {
-			JSONObject object = pJSONArray.getJSONObject(a);
+		for (int i = 0; i < arraySize; i++) {
+			JSONObject upcProducts = pJSONArray.getJSONObject(i);
+			boolean amazonProductError = insertProductError(upcProducts);
+			if (!amazonProductError) {
+				JSONArray products = upcProducts.getJSONArray("products");
+				int size = products.length();
+				for (int j = 0; j < size; j++) {
+					JSONObject jsonProduct = products.getJSONObject(j);
 
-			JSONArray products = object.getJSONArray("products");
-			int size = products.length();
-			for (int i = 0; i < size; i++) {
-				Product product = ses.createWithGeneratedKey(Product.PRODUCT);
-				product.setString(Product.UPC, object.getString("id"));
-				product.setString(Product.STATUS, object.getString("status"));
-				JSONObject obj = products.getJSONObject(i);
-				JSONArray prodNames = obj.names();
-				int prodSize = prodNames.length();
-				for (int j = 0; j < prodSize; j++) {
-					String name = prodNames.getString(j);
-					// logger.info("setting: " + name);
-					product.setObject(product.getMeta().getField(name.toUpperCase()), obj.getString(name));
-					// logger.info(name + ":" + obj.getString(name));
-					// allNames.add(name.toLowerCase() + " " + "VARCHAR(40)");
+					String marketPlaceId = jsonProduct.getString(MARKET_PLACE_ID);
+					String asin = jsonProduct.getString(ASIN);
+					SSessionJdbc ses = getSession();
+					Product productRow = ses.findOrCreate(Product.PRODUCT, marketPlaceId, asin);
+					if (productRow.isNewRow() || pUpdate) {
+						if (!productRow.isNewRow() && pUpdate) {
+							logger.debug("Updating product: {}", asin);
+						}
+						productRow.setString(Product.UPC, upcProducts.getString(UPC));
+						productRow.setString(Product.STATUS, upcProducts.getString(STATUS));
+						productRow.setString(Product.ELASTICSEARCH_ID, marketPlaceId + ":" + asin);
+						productRow.setString(Product.DROP_SHIP_SOURCE, getDropShipSource());
+
+						JSONArray prodNames = jsonProduct.names();
+						int prodSize = prodNames.length();
+						for (int k = 0; k < prodSize; k++) {
+
+							String name = prodNames.getString(k);
+							if (name.equalsIgnoreCase(ASIN) || name.equalsIgnoreCase(MARKET_PLACE_ID)) {
+								// do not reset asin or marketplaceId, these represent primary key of a product
+								continue;
+							} else if (name.equalsIgnoreCase(FEATURE)) {
+								String feature = jsonProduct.getString(name);
+								if (feature.length() > FEATURE_LENGTH) {
+									// trim feature to FEATURE_LENGTH to match DB column length
+									feature = feature.substring(0, FEATURE_LENGTH - 1);
+								}
+								productRow.setObject(productRow.getMeta().getField(name.toUpperCase()), feature);
+							} else {
+								productRow.setObject(productRow.getMeta().getField(name.toUpperCase()),
+										jsonProduct.getString(name));
+							}
+						}
+
+					} else {
+						logger.warn("Product should never exist at this point, must investigate {}", jsonProduct);
+					}
 				}
 			}
 		}
 	}
 
-	public boolean isPurgeProducts() {
-		return mPurgeProducts;
+	public boolean insertProductError(JSONObject upcProducts) {
+		boolean isProductError = false;
+		String amazonStatus = upcProducts.getString(STATUS);
+		if (!amazonStatus.equalsIgnoreCase(STATUS_SUCCESS)) {
+			isProductError = true;
+			String amazonUPC = upcProducts.getString(UPC);
+			String amazonIdType = upcProducts.getString(ID_TYPE);
+			SSessionJdbc ses = getSession();
+			ProductError productError = ses.createWithGeneratedKey(ProductError.PRODUCT_ERROR);
+			productError.setString(ProductError.UPC, amazonUPC);
+			productError.setString(ProductError.ID_TYPE, amazonIdType);
+			productError.setString(ProductError.STATUS, amazonStatus);
+			productError.setObject(ProductError.JSON, upcProducts);
+		}
+		return isProductError;
 	}
 
-	public void setPurgeProducts(boolean pPurgeProducts) {
-		mPurgeProducts = pPurgeProducts;
+	public String getDropShipSource() {
+		return mDropShipSource;
+	}
+
+	public void setDropShipSource(String pDropShipSource) {
+		mDropShipSource = pDropShipSource;
+	}
+
+	public String getSessionName() {
+		return mSessionName;
+	}
+
+	public void setSessionName(String pSessionName) {
+		mSessionName = pSessionName;
 	}
 
 }
