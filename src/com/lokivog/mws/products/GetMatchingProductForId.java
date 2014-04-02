@@ -1,6 +1,6 @@
 package com.lokivog.mws.products;
 
-import static com.lokivog.mws.products.Constants.FEATURE;
+import static com.lokivog.mws.Constants.FEATURE;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -54,6 +54,7 @@ import com.amazonservices.mws.products.model.SalesRankType;
 import com.amazonservices.mws.products.model.SellerSKUIdentifier;
 import com.amazonservices.mws.products.model.ShippingTimeType;
 import com.amazonservices.mws.products.samples.ProductsConfig;
+import com.lokivog.mws.Constants;
 
 //IMPORTANT: The Amazon MWS Java Client API is required to run this class. Download from the Amazon developer website. Once downloaded
 //add the client library to the classpath

@@ -1,7 +1,10 @@
-package com.lokivog.mws.products;
+package com.lokivog.mws.dao;
 
-import static com.lokivog.mws.products.Constants.FEATURE_LENGTH;
+import static com.lokivog.mws.Constants.FEATURE_LENGTH;
 import static simpleorm.dataset.SFieldFlags.SDESCRIPTIVE;
+
+import com.lokivog.mws.Constants;
+
 import simpleorm.dataset.SFieldDouble;
 import simpleorm.dataset.SFieldFlags;
 import simpleorm.dataset.SFieldInteger;
@@ -9,10 +12,11 @@ import simpleorm.dataset.SFieldString;
 import simpleorm.dataset.SRecordInstance;
 import simpleorm.dataset.SRecordMeta;
 
-public class Product extends SRecordInstance {
+public class AmazonProductDAO extends SRecordInstance {
 	private static final long serialVersionUID = 1L;
 
-	public static final SRecordMeta<Product> PRODUCT = new SRecordMeta(Product.class, Constants.TABLE_PRODUCT);
+	public static final SRecordMeta<AmazonProductDAO> PRODUCT = new SRecordMeta(AmazonProductDAO.class,
+			Constants.TABLE_PRODUCT);
 
 	// ie. SRecord objects describe SRecordInstances
 
@@ -60,7 +64,7 @@ public class Product extends SRecordInstance {
 	public static final SFieldDouble PACKAGEHEIGHT = new SFieldDouble(PRODUCT, "PACKAGEHEIGHT");
 
 	public @Override()
-	SRecordMeta<Product> getMeta() {
+	SRecordMeta<AmazonProductDAO> getMeta() {
 		return PRODUCT;
 	};
 }

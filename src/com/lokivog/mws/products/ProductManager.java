@@ -1,14 +1,14 @@
 package com.lokivog.mws.products;
 
-import static com.lokivog.mws.products.Constants.ASIN;
-import static com.lokivog.mws.products.Constants.DROP_SHIP_SOURCE_DEFAULT;
-import static com.lokivog.mws.products.Constants.FEATURE;
-import static com.lokivog.mws.products.Constants.FEATURE_LENGTH;
-import static com.lokivog.mws.products.Constants.ID_TYPE;
-import static com.lokivog.mws.products.Constants.MARKET_PLACE_ID;
-import static com.lokivog.mws.products.Constants.STATUS;
-import static com.lokivog.mws.products.Constants.STATUS_SUCCESS;
-import static com.lokivog.mws.products.Constants.UPC;
+import static com.lokivog.mws.Constants.ASIN;
+import static com.lokivog.mws.Constants.DROP_SHIP_SOURCE_DEFAULT;
+import static com.lokivog.mws.Constants.FEATURE;
+import static com.lokivog.mws.Constants.FEATURE_LENGTH;
+import static com.lokivog.mws.Constants.ID_TYPE;
+import static com.lokivog.mws.Constants.MARKET_PLACE_ID;
+import static com.lokivog.mws.Constants.STATUS;
+import static com.lokivog.mws.Constants.STATUS_SUCCESS;
+import static com.lokivog.mws.Constants.UPC;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -20,6 +20,10 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.lokivog.mws.Constants;
+import com.lokivog.mws.dao.AmazonProductDAO;
+import com.lokivog.mws.dao.AmazonProductErrorDAO;
 
 import simpleorm.dataset.SQuery;
 import simpleorm.dataset.SQueryResult;
@@ -71,8 +75,8 @@ public class ProductManager {
 	public void createTables() {
 		SSessionJdbc ses = getSession();
 		ses.begin();
-		ses.rawUpdateDB(ses.getDriver().createTableSQL(Product.PRODUCT));
-		ses.rawUpdateDB(ses.getDriver().createTableSQL(ProductError.PRODUCT_ERROR));
+		ses.rawUpdateDB(ses.getDriver().createTableSQL(AmazonProductDAO.PRODUCT));
+		ses.rawUpdateDB(ses.getDriver().createTableSQL(AmazonProductErrorDAO.PRODUCT_ERROR));
 		ses.commit();
 	}
 
@@ -128,9 +132,9 @@ public class ProductManager {
 		ses.begin();
 		for (String upc : pProductUPCList) {
 			if (!pUpdate) {
-				SQuery<Product> productQuery = new SQuery<Product>(Product.PRODUCT).eq(Product.UPC, upc).eq(
-						Product.DROP_SHIP_SOURCE, getDropShipSource());
-				List<Product> products = ses.query(productQuery);
+				SQuery<AmazonProductDAO> productQuery = new SQuery<AmazonProductDAO>(AmazonProductDAO.PRODUCT).eq(AmazonProductDAO.UPC, upc).eq(
+						AmazonProductDAO.DROP_SHIP_SOURCE, getDropShipSource());
+				List<AmazonProductDAO> products = ses.query(productQuery);
 				logger.debug("products returned from query: " + products);
 				if (products.isEmpty()) {
 					productIds.add(upc);
@@ -148,9 +152,9 @@ public class ProductManager {
 	public void printQueryResults() {
 		SSessionJdbc ses = getSession();
 		ses.begin();
-		SQueryResult<Product> res = ses.query(new SQuery(Product.PRODUCT));
+		SQueryResult<AmazonProductDAO> res = ses.query(new SQuery(AmazonProductDAO.PRODUCT));
 		SLog.getSessionlessLogger().message("Departments: " + res);
-		for (Product product : res) {
+		for (AmazonProductDAO product : res) {
 			logger.info("----------- New Product ------------");
 			Set<String> fieldNames = product.getMeta().getFieldNames();
 			for (String fieldName : fieldNames) {
@@ -177,15 +181,15 @@ public class ProductManager {
 					String marketPlaceId = jsonProduct.getString(MARKET_PLACE_ID);
 					String asin = jsonProduct.getString(ASIN);
 					SSessionJdbc ses = getSession();
-					Product productRow = ses.findOrCreate(Product.PRODUCT, marketPlaceId, asin);
+					AmazonProductDAO productRow = ses.findOrCreate(AmazonProductDAO.PRODUCT, marketPlaceId, asin);
 					if (productRow.isNewRow() || pUpdate) {
 						if (!productRow.isNewRow() && pUpdate) {
 							logger.debug("Updating product: {}", asin);
 						}
-						productRow.setString(Product.UPC, upcProducts.getString(UPC));
-						productRow.setString(Product.STATUS, upcProducts.getString(STATUS));
-						productRow.setString(Product.ELASTICSEARCH_ID, marketPlaceId + ":" + asin);
-						productRow.setString(Product.DROP_SHIP_SOURCE, getDropShipSource());
+						productRow.setString(AmazonProductDAO.UPC, upcProducts.getString(UPC));
+						productRow.setString(AmazonProductDAO.STATUS, upcProducts.getString(STATUS));
+						productRow.setString(AmazonProductDAO.ELASTICSEARCH_ID, marketPlaceId + ":" + asin);
+						productRow.setString(AmazonProductDAO.DROP_SHIP_SOURCE, getDropShipSource());
 
 						JSONArray prodNames = jsonProduct.names();
 						int prodSize = prodNames.length();
@@ -224,11 +228,11 @@ public class ProductManager {
 			String amazonUPC = upcProducts.getString(UPC);
 			String amazonIdType = upcProducts.getString(ID_TYPE);
 			SSessionJdbc ses = getSession();
-			ProductError productError = ses.createWithGeneratedKey(ProductError.PRODUCT_ERROR);
-			productError.setString(ProductError.UPC, amazonUPC);
-			productError.setString(ProductError.ID_TYPE, amazonIdType);
-			productError.setString(ProductError.STATUS, amazonStatus);
-			productError.setObject(ProductError.JSON, upcProducts);
+			AmazonProductErrorDAO productError = ses.createWithGeneratedKey(AmazonProductErrorDAO.PRODUCT_ERROR);
+			productError.setString(AmazonProductErrorDAO.UPC, amazonUPC);
+			productError.setString(AmazonProductErrorDAO.ID_TYPE, amazonIdType);
+			productError.setString(AmazonProductErrorDAO.STATUS, amazonStatus);
+			productError.setObject(AmazonProductErrorDAO.JSON, upcProducts);
 		}
 		return isProductError;
 	}

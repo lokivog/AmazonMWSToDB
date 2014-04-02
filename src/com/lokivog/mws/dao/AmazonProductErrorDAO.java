@@ -1,6 +1,9 @@
-package com.lokivog.mws.products;
+package com.lokivog.mws.dao;
 
 import static simpleorm.dataset.SGeneratorMode.SSELECT_MAX;
+
+import com.lokivog.mws.Constants;
+
 import simpleorm.dataset.SFieldClob;
 import simpleorm.dataset.SFieldFlags;
 import simpleorm.dataset.SFieldLong;
@@ -8,10 +11,10 @@ import simpleorm.dataset.SFieldString;
 import simpleorm.dataset.SRecordInstance;
 import simpleorm.dataset.SRecordMeta;
 
-public class ProductError extends SRecordInstance {
+public class AmazonProductErrorDAO extends SRecordInstance {
 	private static final long serialVersionUID = 1L;
 
-	public static final SRecordMeta<ProductError> PRODUCT_ERROR = new SRecordMeta(ProductError.class,
+	public static final SRecordMeta<AmazonProductErrorDAO> PRODUCT_ERROR = new SRecordMeta(AmazonProductErrorDAO.class,
 			Constants.TABLE_PRODUCT_ERROR);
 
 	public static final SFieldLong ID = (SFieldLong) new SFieldLong(PRODUCT_ERROR, "ID", SFieldFlags.SPRIMARY_KEY)
@@ -26,7 +29,7 @@ public class ProductError extends SRecordInstance {
 	public static final SFieldClob JSON = new SFieldClob(PRODUCT_ERROR, "JSON");
 
 	public @Override()
-	SRecordMeta<ProductError> getMeta() {
+	SRecordMeta<AmazonProductErrorDAO> getMeta() {
 		return PRODUCT_ERROR;
 	};
 }

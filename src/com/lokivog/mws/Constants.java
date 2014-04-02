@@ -1,7 +1,7 @@
-package com.lokivog.mws.products;
+package com.lokivog.mws;
 
 public class Constants {
-	// amazon constants
+	// amazon product constants
 	public static final String MARKET_PLACE_ID = "marketplaceId";
 	public static final String ASIN = "asin";
 	public static final String STATUS = "status";
