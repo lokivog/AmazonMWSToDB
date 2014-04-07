@@ -1,4 +1,4 @@
-package com.lokivog.mws.products;
+package com.lokivog.mws;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -7,12 +7,12 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 
-public class DBManager {
+public class DBUtilsTest {
 
 	Connection conn; // our connnection to the db - presist for life of program
 
 	// we dont want this garbage collected until we are done
-	public DBManager(String db_file_name_prefix) throws Exception { // note more
+	public DBUtilsTest(String db_file_name_prefix) throws Exception { // note more
 																	// general
 																	// exception
 
@@ -115,11 +115,11 @@ public class DBManager {
 
 	public static void main(String[] args) {
 
-		DBManager db = null;
+		DBUtilsTest db = null;
 
 		try {
 			// db = new DBManager("mem:mymemdb");
-			db = new DBManager("hsqlTempFiles");
+			db = new DBUtilsTest("hsqlTempFiles");
 		} catch (Exception ex1) {
 			ex1.printStackTrace(); // could not start db
 

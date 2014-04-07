@@ -17,6 +17,8 @@ public class Constants {
 	public static final String DROP_SHIP_SOURCE_DEFAULT = "default";
 	public static final String DROP_SHIP_SOURCE_kOLE = "koleimports";
 	public static final int FEATURE_LENGTH = 2555;
+	public static final String OUTPUT_DIR = "output";
+	public static final String OUTPUT_JSON_FILE = OUTPUT_DIR + "/amazonproducts.json";
 
 	// table constants
 	public static final String TABLE_PRODUCT = "AMZ_PRODUCT";

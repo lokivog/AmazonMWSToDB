@@ -1,14 +1,13 @@
 package com.lokivog.mws.products;
 
 import static com.lokivog.mws.Constants.FEATURE;
+import static com.lokivog.mws.Constants.OUTPUT_DIR;
+import static com.lokivog.mws.products.ProductScheduler.JSON_LOGGER;
+import static com.lokivog.mws.products.ProductScheduler.XML_LOGGER;
 
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -45,7 +44,6 @@ import com.amazonservices.mws.products.model.OffersList;
 import com.amazonservices.mws.products.model.PriceType;
 import com.amazonservices.mws.products.model.Product;
 import com.amazonservices.mws.products.model.ProductList;
-import com.amazonservices.mws.products.model.ProductsUtil;
 import com.amazonservices.mws.products.model.QualifiersType;
 import com.amazonservices.mws.products.model.RelationshipList;
 import com.amazonservices.mws.products.model.ResponseMetadata;
@@ -56,18 +54,18 @@ import com.amazonservices.mws.products.model.ShippingTimeType;
 import com.amazonservices.mws.products.samples.ProductsConfig;
 import com.lokivog.mws.Constants;
 
-//IMPORTANT: The Amazon MWS Java Client API is required to run this class. Download from the Amazon developer website. Once downloaded
-//add the client library to the classpath
+// IMPORTANT: The Amazon MWS Java Client API is required to run this class. Download from the Amazon developer website. Once downloaded
+// add the client library to the classpath
 /**
  * The Class GetMatchingProductForId. Calls the Amazon MWS Product Feed API to retrieve a list of products matching a list of UPC ids.
  */
 public class GetMatchingProductForId {
 
-	public static final String OUTPUT_DIR = "output";
-
 	final Logger logger = LoggerFactory.getLogger(GetMatchingProductForId.class);
 
 	private List<String> mProductIds;
+
+	private Date mStartDate = new Date();
 
 	public GetMatchingProductForId(String pId) {
 		createOutputDir();
@@ -75,6 +73,12 @@ public class GetMatchingProductForId {
 
 	public GetMatchingProductForId(List<String> pProductIds) {
 		mProductIds = pProductIds;
+		createOutputDir();
+	}
+
+	public GetMatchingProductForId(List<String> pProductIds, Date pStartDate) {
+		mProductIds = pProductIds;
+		mStartDate = pStartDate;
 		createOutputDir();
 	}
 
@@ -97,7 +101,7 @@ public class GetMatchingProductForId {
 		request.setMarketplaceId(ProductsConfig.marketplaceId);
 		IdListType idListType = new IdListType();
 		idListType.setId(mProductIds);
-		logger.info("Looking up UPC products: {}", mProductIds);
+		logger.debug("Looking up UPC products: {}", mProductIds);
 		request.setIdList(idListType);
 		request.setIdType("UPC");
 		JSONArray response = null;
@@ -126,8 +130,7 @@ public class GetMatchingProductForId {
 	/**
 	 * Just add few required parameters, and try the service Get Matching Product For Id functionality
 	 * 
-	 * @param args
-	 *            unused
+	 * @param args unused
 	 */
 	public static void main(String... args) {
 		List<String> ids = new ArrayList<String>();
@@ -166,27 +169,33 @@ public class GetMatchingProductForId {
 	 * Get Matching Product For Id request sample GetMatchingProduct will return the details (attributes) for the given Identifier list.
 	 * Identifer type can be one of [SKU|ASIN|UPC|EAN|ISBN|GTIN|JAN]
 	 * 
-	 * @param service
-	 *            instance of MarketplaceWebServiceProducts service
-	 * @param request
-	 *            Action to invoke
+	 * @param service instance of MarketplaceWebServiceProducts service
+	 * @param request Action to invoke
 	 */
 	public JSONArray invokeGetMatchingProductForId(MarketplaceWebServiceProducts service,
 			GetMatchingProductForIdRequest request) {
 		GetMatchingProductForIdResponse response = null;
-		PrintWriter printWriter = null;
-
 		JSONArray productArray = new JSONArray();
 		try {
-			printWriter = new PrintWriter(new BufferedWriter(new FileWriter(OUTPUT_DIR + "/amazonproducts.json", true)));
+
 			response = service.getMatchingProductForId(request);
 			logger.debug("GetMatchingProductForId Action Response");
 			List<GetMatchingProductForIdResult> getMatchingProductForIdResultList = response
 					.getGetMatchingProductForIdResult();
 			// logger.info("response: \n" + response.toXML());
+			XML_LOGGER.info(response.toXML());
+			// logger.info(response.toJSON());
 			// Iterates over the Amazon response and builds a json object from the xml response.
 			// This doesn't set all the properties from the xml schema object but it does contain place holders to set them in the future
 			// if needed
+			String requestId = null;
+			if (response.isSetResponseMetadata()) {
+				ResponseMetadata responseMetadata = response.getResponseMetadata();
+				if (responseMetadata.isSetRequestId()) {
+					requestId = responseMetadata.getRequestId();
+					logger.debug("responseMetadata requestId {}", responseMetadata.getRequestId());
+				}
+			}
 			for (GetMatchingProductForIdResult getMatchingProductForIdResult : getMatchingProductForIdResultList) {
 				JSONObject object = new JSONObject();
 				if (getMatchingProductForIdResult.isSetId()) {
@@ -274,7 +283,7 @@ public class GetMatchingProductForId {
 							RelationshipList relationships = product.getRelationships();
 							for (Object obj : relationships.getAny()) {
 								Node relationship = (Node) obj;
-								System.out.println(ProductsUtil.formatXml(relationship));
+								// System.out.println(ProductsUtil.formatXml(relationship));
 							}
 						}
 						if (product.isSetCompetitivePricing()) {
@@ -455,23 +464,23 @@ public class GetMatchingProductForId {
 						array.put(jsonProduct);
 					}
 					object.put(Constants.PRODUCTS, array);
-					printWriter.println(object.toString());
 					// processJSON(object);
 					// insertJSONIntoDB(object);
 					// logger.info("jsonProduct: " + object);
 				}
 				if (getMatchingProductForIdResult.isSetError()) {
 					com.amazonservices.mws.products.model.Error error = getMatchingProductForIdResult.getError();
-					logger.warn("Amazon Response Error - Type: {}, Code: {}, Message: {}", error.getType(),
+					logger.error("Amazon Response Error - Type: {}, Code: {}, Message: {}", error.getType(),
 							error.getCode(), error.getMessage());
+					object.put("errorType", error.getType());
+					object.put("errorCode", error.getCode());
+					object.put("errorMessage", error.getMessage());
+				}
+				if (requestId != null) {
+					object.put("requestId", requestId);
 				}
 				productArray.put(object);
-			}
-			if (response.isSetResponseMetadata()) {
-				ResponseMetadata responseMetadata = response.getResponseMetadata();
-				if (responseMetadata.isSetRequestId()) {
-					logger.debug("responseMetadata requestId {}", responseMetadata.getRequestId());
-				}
+				JSON_LOGGER.info(object.toString());
 			}
 
 		} catch (MarketplaceWebServiceProductsException ex) {
@@ -482,14 +491,6 @@ public class GetMatchingProductForId {
 			logger.error("Request ID: " + ex.getRequestId());
 			logger.error("XML: " + ex.getXML());
 			logger.error("ResponseHeaderMetadata: " + ex.getResponseHeaderMetadata());
-		} catch (FileNotFoundException e) {
-			logger.error("FileNotFound", e);
-		} catch (IOException e) {
-			logger.error("IOException", e);
-		} finally {
-			if (printWriter != null) {
-				printWriter.close();
-			}
 		}
 		return productArray;
 	}
