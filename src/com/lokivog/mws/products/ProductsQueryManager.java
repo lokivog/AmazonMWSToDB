@@ -3,6 +3,7 @@ package com.lokivog.mws.products;
 import java.util.List;
 import java.util.Set;
 
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,12 +16,20 @@ import com.lokivog.mws.dao.AmazonProductDAO;
 public class ProductsQueryManager {
 
 	final static Logger logger = LoggerFactory.getLogger(ProductManager.class);
+	private ProductManager mProductManager = new ProductManager(ProductsQueryManager.class.getSimpleName());
 
-	public String queryProductType(ProductManager pProductManager, String pUPC, int pPackageQuantity,
-			String pDropShipSource) {
+	public ProductsQueryManager() {
+		mProductManager.initDBConnection();
+	}
+
+	public void shutdown() {
+		getProductManager().shutdownDB();
+	}
+
+	public JSONObject queryProductType(String pUPC, int pPackageQuantity, String pDropShipSource) {
 		// getQueryText();
-		String productGruop = null;
-		SSessionJdbc ses = pProductManager.getSession();
+		JSONObject jsonObject = null;
+		SSessionJdbc ses = getProductManager().getSession();
 		try {
 			ses.begin();
 			SQuery productQuery = new SQuery<AmazonProductDAO>(AmazonProductDAO.PRODUCT).eq(AmazonProductDAO.UPC, pUPC)
@@ -30,8 +39,17 @@ public class ProductsQueryManager {
 			logger.info("Query for UPC: {}, PACKAGEQUANTITY: {}, result size: {}", pUPC, pPackageQuantity,
 					products.size());
 			if (!products.isEmpty()) {
-				AmazonProductDAO product = (AmazonProductDAO) products.get(0);
-				productGruop = product.getString(AmazonProductDAO.PRODUCTGROUP);
+				if (products.size() == 1) {
+					jsonObject = new JSONObject();
+					AmazonProductDAO product = (AmazonProductDAO) products.get(0);
+					jsonObject.put("productGroup", product.getString(AmazonProductDAO.PRODUCTGROUP));
+					jsonObject.put("asin", product.getString(AmazonProductDAO.ASIN));
+				} else {
+					logger.error(
+							"Found multiple products for UPC: {}, QUANTITY: {}, DROPSHIP: {}, products returned: {}, not returning either any product. Must investigate",
+							pUPC, pPackageQuantity, pDropShipSource, products.size());
+				}
+
 			}
 			// printQueryResults(products);
 		} finally {
@@ -39,7 +57,7 @@ public class ProductsQueryManager {
 				ses.commit();
 			}
 		}
-		return productGruop;
+		return jsonObject;
 	}
 
 	public void printQueryResults(List<SRecordInstance> pResults) {
@@ -51,4 +69,13 @@ public class ProductsQueryManager {
 			}
 		}
 	}
+
+	public ProductManager getProductManager() {
+		return mProductManager;
+	}
+
+	public void setProductManager(ProductManager pProductManager) {
+		mProductManager = pProductManager;
+	}
+
 }

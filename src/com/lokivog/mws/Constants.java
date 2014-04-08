@@ -19,6 +19,7 @@ public class Constants {
 	public static final int FEATURE_LENGTH = 2555;
 	public static final String OUTPUT_DIR = "output";
 	public static final String OUTPUT_JSON_FILE = OUTPUT_DIR + "/amazonproducts.json";
+	public static final String CONFIG_NAME = "resources/config.properties";
 
 	// table constants
 	public static final String TABLE_PRODUCT = "AMZ_PRODUCT";

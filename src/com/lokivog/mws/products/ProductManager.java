@@ -11,14 +11,12 @@ import static com.lokivog.mws.Constants.STATUS_SUCCESS;
 import static com.lokivog.mws.Constants.UPC;
 
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.Properties;
 import java.util.Set;
 
 import org.json.JSONArray;
@@ -35,19 +33,17 @@ import simpleorm.dataset.SRecordMeta;
 import simpleorm.sessionjdbc.SSessionJdbc;
 import simpleorm.utils.SLog;
 
+import com.lokivog.mws.config.StandaloneConfiguration;
 import com.lokivog.mws.dao.AmazonProductDAO;
 import com.lokivog.mws.dao.AmazonProductErrorDAO;
 
 public class ProductManager {
 
-	public static final String CONFIG_NAME = "/home/atgdev/github/AmazonMWSToDB/resources/config.properties";
 	public static final String DRIVER = "org.hsqldb.jdbcDriver";
 	public static final String POSTGRES_DRIVER = "org.postgresql.Driver";
 
 	public static final SRecordMeta<?>[] TABLES = { AmazonProductDAO.PRODUCT, AmazonProductErrorDAO.PRODUCT_ERROR };
 	final Logger logger = LoggerFactory.getLogger(ProductManager.class);
-
-	public static ProductManager productManager = null;
 
 	// database properties
 	private Connection connection = null;
@@ -73,11 +69,6 @@ public class ProductManager {
 		setSessionName(pSessionName);
 		setDropShipSource(DROP_SHIP_SOURCE_DEFAULT);
 		initDBConnection();
-		if (productManager == null) {
-			synchronized (productManager) {
-				productManager = this;
-			}
-		}
 		// Class.forName(DRIVER);
 		// connection = java.sql.DriverManager.getConnection("jdbc:hsqldb:hsqlTempFiles;shutdown=true;", "sa", "");
 
@@ -98,36 +89,23 @@ public class ProductManager {
 
 	}
 
-	public static ProductManager getProductManager() {
-		if (productManager == null) {
-			productManager = new ProductManager("Singleton");
-		}
-		return productManager;
-	}
-
 	public boolean initDBConnection() {
 		boolean success = false;
-		Properties props = new Properties();
 		String url = null;
 		String userName = null;
 		FileInputStream in = null;
 		try {
-			in = new FileInputStream(CONFIG_NAME);
-			props.load(in);
-			url = props.getProperty("db.url");
-			userName = props.getProperty("db.username");
-			String pswd = props.getProperty("db.password");
-			setDriverName(props.getProperty("db.driver"));
-			logger.debug("db.url: {}, db.username: {}, db.driver: {}", props.get("db.url"), userName, getDriverName());
+			StandaloneConfiguration sc = StandaloneConfiguration.getInstance();
+			url = sc.getDBURL();
+			userName = sc.getDBUserName();
+			String pswd = sc.getDBPassword();
+			setDriverName(sc.getDBDriver());
+			logger.debug("db.url: {}, db.username: {}, db.driver: {}", sc.getDBURL(), userName, getDriverName());
 			Class.forName(getDriverName());
 			logger.info("opening connection for database: {}", url);
 			connection = java.sql.DriverManager.getConnection(url, userName, pswd);
 			success = true;
 			setConnectionEstablished(true);
-		} catch (FileNotFoundException e) {
-			logger.error(CONFIG_NAME + "not found", e);
-		} catch (IOException e) {
-			logger.error("IOError loading properties for " + CONFIG_NAME, e);
 		} catch (ClassNotFoundException e) {
 			logger.error("Driver class not found for: " + DRIVER, e);
 		} catch (SQLException e) {
@@ -356,7 +334,7 @@ public class ProductManager {
 						}
 
 					} else {
-						logger.warn("Product should never exist at this point, must investigate {}", jsonProduct);
+						logger.debug("Product should never exist at this point, must investigate {}", jsonProduct);
 					}
 				}
 			}

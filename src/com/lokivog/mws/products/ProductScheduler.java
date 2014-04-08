@@ -1,22 +1,18 @@
 package com.lokivog.mws.products;
 
 import java.io.BufferedReader;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import simpleorm.utils.SLog;
 
 import com.lokivog.mws.Constants;
+import com.lokivog.mws.MWSUtils;
 
 /**
  * The Class ProductScheduler is the main class to run for retrieving products from Amazon.
@@ -35,7 +31,7 @@ public class ProductScheduler {
 		ids.add("731015110650");
 		// ids.add("731015110704");
 		// ids.add("731015110810");
-		List<List> subLists = split(ids, 1);
+		List<List> subLists = MWSUtils.split(ids, 1);
 		int count = 1;
 		for (List subList : subLists) {
 			logger.info("list: {}, size: {}", count++, subList.size());
@@ -50,18 +46,18 @@ public class ProductScheduler {
 				SLog.getSessionlessLogger().setLevel(0);
 				// SLog.setSlogClass(SLogSlf4j.class);
 
-				// pm.dropTables();
-				// pm.createTables();
+				pm.dropTables();
+				pm.createTables();
 				// pm.printQueryResults();
 				List<String> ids = new ArrayList<String>();
 				// ids.add("73101511064323433");
 				ids.add("731015110650");
-				ids = loadProductIds();
+				// ids = loadProductIds();
 				boolean update = false;
 				boolean insertProductsFromJson = false;
 
 				if (!insertProductsFromJson) {
-					List<List<String>> subLists = split(ids, Constants.MAX_PRODUCT_LOOKUP_SIZE);
+					List<List<String>> subLists = MWSUtils.split(ids, Constants.MAX_PRODUCT_LOOKUP_SIZE);
 					int subListSize = subLists.size();
 					int count = 1;
 					logger.info("Total List size: {}, total items: ", subListSize, subListSize
@@ -75,10 +71,10 @@ public class ProductScheduler {
 				}
 
 				if (insertProductsFromJson) {
-					JSONArray jsonArray = loadAmazonProductsFromJSON();
-					logger.info("Total JSONArray size: {}", jsonArray.length());
+					// JSONArray jsonArray = loadAmazonProductsFromJSON();
+					// logger.info("Total JSONArray size: {}", jsonArray.length());
 
-					pm.insertJSONProducts(jsonArray, update);
+					// pm.insertJSONProducts(jsonArray, update);
 				}
 				// logger.info("JsonArray: {}", jsonArray);
 
@@ -92,63 +88,31 @@ public class ProductScheduler {
 		}
 	}
 
-	private List<String> loadProductIds() {
-		List<String> productIds = new ArrayList<String>(110);
-		FileReader reader = null;
+	public void installProductsFromDropBox() {
+		Runtime r = Runtime.getRuntime();
+		BufferedReader br = null;
 		try {
-			reader = new FileReader("output/products1.txt");
-			BufferedReader br = new BufferedReader(reader);
+			Process p = r.exec("scripts/install_products_from_dropbox.sh");
+			p.waitFor();
+			br = new BufferedReader(new InputStreamReader(p.getInputStream()));
 			String line = "";
+
 			while ((line = br.readLine()) != null) {
-				productIds.add(line);
+				logger.info(line);
 			}
-		} catch (FileNotFoundException e) {
-			logger.error("File not found", e);
 		} catch (IOException e) {
 			logger.error("IOException", e);
+		} catch (InterruptedException e) {
+			logger.error("InterruptedException", e);
 		} finally {
-			if (reader != null) {
+			if (br != null) {
 				try {
-					reader.close();
+					br.close();
 				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
+					logger.error("IOException", e);
 				}
 			}
 		}
-		return productIds;
-	}
-
-	private JSONArray loadAmazonProductsFromJSON() {
-		FileReader reader = null;
-		JSONArray jsonArray = new JSONArray();
-		try {
-			reader = new FileReader(Constants.OUTPUT_JSON_FILE);
-			BufferedReader br = new BufferedReader(reader);
-			String currentJSONString = "";
-			while ((currentJSONString = br.readLine()) != null) {
-				// create new JSONObject
-				JSONObject currentObject = new JSONObject(currentJSONString);
-				jsonArray.put(currentObject);
-
-			}
-		} catch (FileNotFoundException e) {
-			logger.error(Constants.OUTPUT_JSON_FILE + "not found", e);
-		} catch (JSONException e) {
-			logger.error("JSON parse exception", e);
-		} catch (IOException e) {
-			logger.error("IOException", e);
-		} finally {
-			if (reader != null) {
-				try {
-					reader.close();
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-			}
-		}
-		return jsonArray;
 	}
 
 	public void syncDropBox() {
@@ -178,40 +142,16 @@ public class ProductScheduler {
 		}
 	}
 
-	/**
-	 * Splits a list into multiple sub lists.
-	 * 
-	 * @param list the list
-	 * @param i the i
-	 * @return the list
-	 */
-	private List split(List list, int i) {
-		List out = new ArrayList<List>();
-		int size = list.size();
-		int number = size / i;
-		int remain = size % i;
-		if (remain != 0) {
-			number++;
-		}
-		for (int j = 0; j < number; j++) {
-			int start = j * i;
-			int end = start + i;
-			if (end > list.size()) {
-				end = list.size();
-			}
-			out.add(list.subList(start, end));
-		}
-		return out;
-	}
-
 	public void testlog() {
 		logger.info("Amazon Response Error - Type: Sender, Code: InvalidParameterValue, Message: Invalid UPC identifier 70659812224 for marketplace ATVPDKIKX0DER");
 	}
 
 	public static void main(String[] args) {
 		ProductScheduler scheduler = new ProductScheduler();
-		scheduler.syncDropBox();
+		// scheduler.syncDropBox();
 		scheduler.run();
+
+		// scheduler.installProductsFromDropBox();
 
 		// ProcessFeed processFeed = new ProcessFeed();
 		// processFeed.processFeed();
