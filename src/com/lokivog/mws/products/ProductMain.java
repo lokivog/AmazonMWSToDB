@@ -7,8 +7,13 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.Predicate;
+import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -31,22 +36,45 @@ public class ProductMain {
 	public static void main(String[] args) {
 		ProductMain productMain = new ProductMain();
 		// productMain.installProductsFromDropBox();
+		boolean update = true;
+		boolean ignoreRecentlyProcessed = false;
+		SLog.getSessionlessLogger().setLevel(0);
 		// productMain.runIds();
+		String idType = "ASIN";
+		productMain.runFromFile(ignoreRecentlyProcessed, update, idType);
 		// productMain.getJSONProduct();
-		productMain.conertToJSON();
+		// productMain.installProductsFromLocalJSON(update);
+		// productMain.conertToJSON();
 	}
 
-	public void runIds() {
+	public void runIds(boolean pUpdate, String pIdType) {
 		ProductManager pm = null;
 		try {
 			pm = new ProductManager(ProductScheduler.class.getSimpleName(), Constants.DROP_SHIP_SOURCE_kOLE);
 			if (pm.initDBConnection()) {
-				SLog.getSessionlessLogger().setLevel(0);
 				List<String> ids = new ArrayList<String>();
 				// ids.add("73101511064323433");
-				ids.add("017874006052");
+				// ids.add("731015155644"); UPC from amazon that changed quantities
+				ids.add("731015110643");
+				ids.add("731015110650");
+				ids.add("731015110704");
+				ids.add("731015110810");
+				ids.add("731015109036");
+				ids.add("731015109302");
+				ids.add("731015109524");
+				ids.add("731015109777");
+				ids.add("731015110001");
+				ids.add("731015110032");
+				ids.add("731015110056");
+				ids.add("731015110063");
+				ids.add("731015110070");
+				ids.add("731015110582");
+				ids.add("731015110476");
+				ids.add("731015110797");
+				ids.add("731015110803");
+				ids.add("731015109456");
+				ids.add("731015109463");
 				// ids = loadProductIds();
-				boolean update = false;
 
 				List<List<String>> subLists = MWSUtils.split(ids, Constants.MAX_PRODUCT_LOOKUP_SIZE);
 				int subListSize = subLists.size();
@@ -56,7 +84,7 @@ public class ProductMain {
 				for (List<String> subList : subLists) {
 					logger.info("Processing list {} of {}, items remaining: {}", count, subListSize,
 							(subListSize - count) * Constants.MAX_PRODUCT_LOOKUP_SIZE);
-					pm.findAndInsertProducts(subList, update);
+					pm.findAndInsertProducts(subList, pUpdate, pIdType);
 					count++;
 				}
 
@@ -70,17 +98,58 @@ public class ProductMain {
 		}
 	}
 
-	public void run(JSONArray jsonArray) {
+	public void runFromFile(boolean pIgnoreRecentlyProcessed, boolean pUpdate, String pIdType) {
+		String fileName = "input/upcs.txt";
+		List<String> upcs = null;
+		try {
+			upcs = FileUtils.readLines(new File("input/upcs.txt"));
+		} catch (IOException e) {
+			logger.error("Error loading file: " + fileName, e);
+		}
+		if (upcs != null && !upcs.isEmpty()) {
+			if (!pIgnoreRecentlyProcessed) {
+				int sizeBefore = upcs.size();
+				Set<String> products = loadProductIdsFromJSON("output/json/amzproducts.json");
+				Predicate recentlyDownloadedPredicate = new RecentlyDownloadedPredicate(products);
+				CollectionUtils.filter(upcs, recentlyDownloadedPredicate);
+				int sizeAfter = upcs.size();
+				logger.info("filtered out recently processed ids. Before size: {}, after size: {}", sizeBefore,
+						sizeAfter);
+			}
+
+			ProductManager pm = null;
+			try {
+				pm = new ProductManager(ProductScheduler.class.getSimpleName(), Constants.DROP_SHIP_SOURCE_kOLE);
+				if (pm.initDBConnection()) {
+					List<List<String>> subLists = MWSUtils.split(upcs, Constants.MAX_PRODUCT_LOOKUP_SIZE);
+					int subListSize = subLists.size();
+					int count = 1;
+					logger.info("Total List size: {}, total items: ", subListSize, subListSize
+							* Constants.MAX_PRODUCT_LOOKUP_SIZE);
+					for (List<String> subList : subLists) {
+						logger.info("Processing list {} of {}, items remaining: {}", count, subListSize,
+								(subListSize - count) * Constants.MAX_PRODUCT_LOOKUP_SIZE);
+						pm.findAndInsertProducts(subList, pUpdate, pIdType);
+						count++;
+					}
+				}
+			} finally {
+				if (pm != null) {
+					pm.shutdownDB();
+				}
+			}
+		}
+	}
+
+	public void run(JSONArray jsonArray, boolean pUpdate) {
 		ProductManager pm = null;
 		try {
 			pm = new ProductManager(ProductMain.class.getSimpleName(), Constants.DROP_SHIP_SOURCE_kOLE);
 			if (pm.initDBConnection()) {
 				SLog.getSessionlessLogger().setLevel(0);
-				boolean update = false;
 				logger.info("Total JSONArray size: {}", jsonArray.length());
-				pm.insertJSONProducts(jsonArray, update);
+				pm.insertJSONProducts(jsonArray, pUpdate);
 			}
-
 		} finally {
 			if (pm != null) {
 				pm.shutdownDB();
@@ -88,7 +157,7 @@ public class ProductMain {
 		}
 	}
 
-	public void installProductsFromDropBox() {
+	public void installProductsFromDropBox(boolean pUpdate) {
 		// runinstallProductsFromDropBoxScript();
 		String productsDir = StandaloneConfiguration.getInstance().getBuildProductsDir();
 		File folder = new File(productsDir);
@@ -97,10 +166,15 @@ public class ProductMain {
 				listFilesForFolder(fileEntry);
 			} else {
 				JSONArray array = loadAmazonProductsFromJSON(fileEntry);
-				run(array);
+				run(array, pUpdate);
 				// System.out.println(fileEntry.getName());
 			}
 		}
+	}
+
+	public void installProductsFromLocalJSON(boolean pUpdate) {
+		JSONArray array = loadAmazonProductsFromJSON(new File("output/json/amzproducts.json"));
+		run(array, pUpdate);
 	}
 
 	private void runinstallProductsFromDropBoxScript() {
@@ -246,6 +320,26 @@ public class ProductMain {
 		return jsonArray;
 	}
 
+	private Set<String> loadProductIdsFromJSON(String pFile) {
+		Set<String> productIds = null;
+		try {
+			List<String> lines = FileUtils.readLines(new File(pFile));
+			productIds = new HashSet<String>(lines.size());
+
+			for (String line : lines) {
+				JSONObject object = new JSONObject(line);
+				if (object.has("id")) {
+					productIds.add(object.getString("id"));
+				}
+			}
+		} catch (JSONException e) {
+			logger.error("JSONException processing line", e);
+		} catch (IOException e) {
+			logger.error("IOException", e);
+		}
+		return productIds;
+	}
+
 	private List<String> loadProductIds(String pFile) {
 		List<String> productIds = new ArrayList<String>(100);
 		FileReader reader = null;
@@ -290,4 +384,18 @@ public class ProductMain {
 		}
 	}
 
+}
+
+class RecentlyDownloadedPredicate implements Predicate<String> {
+
+	private Set<String> set;
+
+	public RecentlyDownloadedPredicate(Set<String> pSet) {
+		set = pSet;
+	}
+
+	@Override
+	public boolean evaluate(String pStr) {
+		return set.contains(pStr);
+	}
 }

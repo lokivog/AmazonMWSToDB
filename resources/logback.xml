@@ -41,6 +41,20 @@
 			<pattern>%msg%n</pattern>
 		</encoder>
 	</appender>
+	
+	<appender name="ADD-ITEMS" class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<file>output/added_items.txt</file>
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<fileNamePattern>output/koleproducts.%d{yyyy-MM}-%d{dd.HH.mm.ss,aux}.%i.json.gz</fileNamePattern>
+			<maxHistory>5</maxHistory>
+			<timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+				<maxFileSize>10MB</maxFileSize>
+			</timeBasedFileNamingAndTriggeringPolicy>
+		</rollingPolicy>
+		<encoder>
+			<pattern>%msg%n</pattern>
+		</encoder>
+	</appender>
 
 
 	<appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
@@ -75,6 +89,9 @@
 	</logger>
 	<logger name="koleimports" level="INFO" additivity="false">
 		<appender-ref ref="KOLE-IMPORTS" />
+	</logger>
+	<logger name="additems" level="INFO" additivity="false">
+		<appender-ref ref="ADD-ITEMS" />
 	</logger>
 
 	<root level="info">

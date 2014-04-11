@@ -2,4 +2,6 @@ build/
 bin/
 dist/
 output/
+input/
 logs/
+hsqlTempFiles.*

@@ -38,7 +38,7 @@ public class ProductScheduler {
 		}
 	}
 
-	public void run() {
+	public void run(boolean pUpdate, String pIdType) {
 		ProductManager pm = null;
 		try {
 			pm = new ProductManager(ProductScheduler.class.getSimpleName(), Constants.DROP_SHIP_SOURCE_kOLE);
@@ -53,7 +53,6 @@ public class ProductScheduler {
 				// ids.add("73101511064323433");
 				ids.add("731015110650");
 				// ids = loadProductIds();
-				boolean update = false;
 				boolean insertProductsFromJson = false;
 
 				if (!insertProductsFromJson) {
@@ -65,7 +64,7 @@ public class ProductScheduler {
 					for (List<String> subList : subLists) {
 						logger.info("Processing list {} of {}, items remaining: {}", count, subListSize,
 								(subListSize - count) * Constants.MAX_PRODUCT_LOOKUP_SIZE);
-						pm.findAndInsertProducts(subList, update);
+						pm.findAndInsertProducts(subList, pUpdate, pIdType);
 						count++;
 					}
 				}
@@ -149,7 +148,7 @@ public class ProductScheduler {
 	public static void main(String[] args) {
 		ProductScheduler scheduler = new ProductScheduler();
 		// scheduler.syncDropBox();
-		scheduler.run();
+		scheduler.run(false, "UPC");
 
 		// scheduler.installProductsFromDropBox();
 

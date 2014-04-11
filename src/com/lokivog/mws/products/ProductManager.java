@@ -68,6 +68,7 @@ public class ProductManager {
 	public ProductManager(String pSessionName) {
 		setSessionName(pSessionName);
 		setDropShipSource(DROP_SHIP_SOURCE_DEFAULT);
+		SLog.getSessionlessLogger().setLevel(0);
 		initDBConnection();
 		// Class.forName(DRIVER);
 		// connection = java.sql.DriverManager.getConnection("jdbc:hsqldb:hsqlTempFiles;shutdown=true;", "sa", "");
@@ -83,6 +84,7 @@ public class ProductManager {
 	public ProductManager(String pSessionName, String pDropShipSource) {
 		setSessionName(pSessionName);
 		setDropShipSource(pDropShipSource);
+		SLog.getSessionlessLogger().setLevel(0);
 		// connection = java.sql.DriverManager.getConnection("jdbc:hsqldb:hsqlTempFiles;shutdown=true;", "sa", "");
 		// String url = "jdbc:postgresql://localhost/amazon";
 		// connection = java.sql.DriverManager.getConnection(url, "postgres", "postgres");
@@ -187,11 +189,11 @@ public class ProductManager {
 		return ses;
 	}
 
-	public void findAndInsertProducts(List<String> pProductUPCList, boolean pUpdate) {
+	public void findAndInsertProducts(List<String> pProductUPCList, boolean pUpdate, String pIdType) {
 		List<String> productIds = filterExistingProducts(pProductUPCList, pUpdate);
 		logger.debug("product ids: " + productIds);
 		if (!productIds.isEmpty()) {
-			GetMatchingProductForId matchingProducts = new GetMatchingProductForId(productIds, mStartDate);
+			GetMatchingProductForId matchingProducts = new GetMatchingProductForId(productIds, mStartDate, pIdType);
 			JSONArray jsonArray = matchingProducts.matchProducts();
 			insertJSONProducts(jsonArray, pUpdate);
 		} else {
@@ -274,10 +276,20 @@ public class ProductManager {
 					String asin = jsonProduct.getString(ASIN);
 					AmazonProductDAO productRow = ses.findOrCreate(AmazonProductDAO.PRODUCT, marketPlaceId, asin);
 					if (productRow.isNewRow() || pUpdate) {
+						String upc = upcProducts.getString(UPC);
 						if (!productRow.isNewRow() && pUpdate) {
 							logger.debug("Updating product: {}", asin);
 						}
-						String upc = upcProducts.getString(UPC);
+						if (pUpdate) {
+							if (!productRow.isNewRow()) {
+								if (auditProductChanges(jsonProduct, productRow)) {
+									continue;
+								}
+							} else {
+								logger.info("Found new ASIN: {} for Existing UPC: {}", asin, upc);
+							}
+						}
+
 						productRow.setString(AmazonProductDAO.UPC, upc);
 						productRow.setString(AmazonProductDAO.STATUS, upcProducts.getString(STATUS));
 						productRow.setString(AmazonProductDAO.ELASTICSEARCH_ID, marketPlaceId + "-" + asin);
@@ -340,6 +352,82 @@ public class ProductManager {
 			}
 		}
 
+	}
+
+	private boolean auditProductChanges(JSONObject pJsonProduct, AmazonProductDAO pProductRow) {
+		boolean audit = true;
+		String asin = pJsonProduct.getString(ASIN);
+		logger.debug("auditing product ASIN: {} for changes ", asin);
+		String upc = pProductRow.getString(AmazonProductDAO.UPC);
+		JSONArray prodNames = pJsonProduct.names();
+		int prodSize = prodNames.length();
+		for (int k = 0; k < prodSize; k++) {
+			boolean hasChanged = false;
+			String name = prodNames.getString(k);
+			String nameUpper = name.toUpperCase();
+			Object jsonValue = pJsonProduct.getString(name);
+			Object amazonValue = null;
+			SFieldMeta field = pProductRow.getMeta().getField(nameUpper);
+			if (field == null) {
+				logger.error("Field: {} does not exist in Table", nameUpper);
+				continue;
+			} else {
+				amazonValue = pProductRow.getObject(field);
+			}
+			if (jsonValue != null && amazonValue == null) {
+				hasChanged = true;
+				logger.info("Field: {}, was previously null, now has not value: {}, for ASIN: {}, UPC: {}", name,
+						jsonValue, asin, upc);
+			} else if (amazonValue instanceof String) {
+				if (!jsonValue.equals(amazonValue)) {
+					hasChanged = true;
+					logger.warn("Field: {}, was updated,  {}!={}, (old != new) value for product ASIN: {}, UPC: {}",
+							name, amazonValue, jsonValue, asin, upc);
+				}
+			} else if (amazonValue instanceof Integer) {
+				Integer amazonInt = (Integer) amazonValue;
+				Integer jsonInt = Integer.valueOf((String) jsonValue);
+				if (!jsonInt.equals(amazonInt)) {
+					if (nameUpper.equals("PACKAGEQUANTITY")) {
+						logger.warn(
+								"WARNING PACKAGEQUANTITY WAS UPDATED!! Deactivate Product now. Field: {}, was updated: {}!={} old=new value: for product ASIN: {}, UPC: {}",
+								name, amazonValue, jsonValue, asin, upc);
+					} else {
+						logger.warn(
+								"Field: {}, was updated,  {}!={}, (old != new) value for product ASIN: {}, UPC: {}",
+								name, amazonValue, jsonValue, asin, upc);
+					}
+					hasChanged = true;
+
+				}
+			} else if (amazonValue instanceof Double) {
+				Double amazonDbl = (Double) amazonValue;
+				Double jsonDbl = Double.valueOf((String) jsonValue);
+				if (!jsonDbl.equals(amazonDbl)) {
+					hasChanged = true;
+					logger.warn("Field: {}, was updated,  {}!={}, (old != new) value for product ASIN: {}, UPC: {}",
+							name, amazonValue, jsonValue, asin, upc);
+				}
+			} else if (amazonValue instanceof Boolean) {
+				Boolean amazonBol = (Boolean) amazonValue;
+				Boolean jsonBol = Boolean.valueOf((String) jsonValue);
+				if (!jsonBol.equals(amazonBol)) {
+					hasChanged = true;
+					logger.warn("Field: {}, was updated,  {}!={}, (old != new) value for product ASIN: {}, UPC: {}",
+							name, amazonValue, jsonValue, asin, upc);
+				}
+			} else {
+				if (!jsonValue.equals(amazonValue)) {
+					hasChanged = true;
+					logger.info("jsonValue class: {}, value: {}", jsonValue.getClass(), jsonValue);
+					logger.info("amazonValue class: {}, value: {}", amazonValue.getClass(), amazonValue);
+					logger.warn("Field: {}, was updated,  {}!={}, (old != new) value for product ASIN: {}, UPC: {}",
+							name, amazonValue, jsonValue, asin, upc);
+				}
+			}
+		}
+
+		return audit;
 	}
 
 	public boolean insertProductError(JSONObject upcProducts) {

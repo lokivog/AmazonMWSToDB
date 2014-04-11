@@ -67,6 +67,8 @@ public class GetMatchingProductForId {
 
 	private Date mStartDate = new Date();
 
+	private String mIdType = "UPC";
+
 	public GetMatchingProductForId(String pId) {
 		createOutputDir();
 	}
@@ -76,9 +78,10 @@ public class GetMatchingProductForId {
 		createOutputDir();
 	}
 
-	public GetMatchingProductForId(List<String> pProductIds, Date pStartDate) {
+	public GetMatchingProductForId(List<String> pProductIds, Date pStartDate, String pIdType) {
 		mProductIds = pProductIds;
 		mStartDate = pStartDate;
+		mIdType = pIdType;
 		createOutputDir();
 	}
 
@@ -103,7 +106,7 @@ public class GetMatchingProductForId {
 		idListType.setId(mProductIds);
 		logger.debug("Looking up UPC products: {}", mProductIds);
 		request.setIdList(idListType);
-		request.setIdType("UPC");
+		request.setIdType(getIdType());
 		JSONArray response = null;
 		try {
 			response = invokeGetMatchingProductForId(service, request);
@@ -538,4 +541,13 @@ public class GetMatchingProductForId {
 		}
 		logger.info("prodNames: " + allNames);
 	}
+
+	public String getIdType() {
+		return mIdType;
+	}
+
+	public void setIdType(String pIdType) {
+		mIdType = pIdType;
+	}
+
 }

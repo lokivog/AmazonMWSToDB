@@ -11,7 +11,7 @@ import org.slf4j.LoggerFactory;
  * 
  */
 public class StandaloneConfiguration {
-	public static final String CONFIGURATION_PROPERTY_FILE_NAME = "/home/mvogel/github/AmazonMWSToDB/resources/standalone.configuration.properties";
+	public static final String CONFIGURATION_PROPERTY_FILE_NAME = "standalone.configuration.properties";
 	private static final Logger logger = LoggerFactory.getLogger(StandaloneConfiguration.class);
 	private PropertiesConfiguration propertiesConfiguration;
 	private static StandaloneConfiguration instance = new StandaloneConfiguration();
