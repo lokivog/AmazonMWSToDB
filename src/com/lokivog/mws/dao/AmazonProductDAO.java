@@ -7,6 +7,7 @@ import simpleorm.dataset.SFieldDouble;
 import simpleorm.dataset.SFieldFlags;
 import simpleorm.dataset.SFieldInteger;
 import simpleorm.dataset.SFieldString;
+import simpleorm.dataset.SFieldTimestamp;
 import simpleorm.dataset.SRecordInstance;
 import simpleorm.dataset.SRecordMeta;
 
@@ -70,6 +71,9 @@ public class AmazonProductDAO extends SRecordInstance {
 	public static final SFieldDouble PACKAGELENGTH = new SFieldDouble(PRODUCT, "PACKAGELENGTH");
 	public static final SFieldDouble PACKAGEWEIGHT = new SFieldDouble(PRODUCT, "PACKAGEWEIGHT");
 	public static final SFieldDouble PACKAGEHEIGHT = new SFieldDouble(PRODUCT, "PACKAGEHEIGHT");
+	public static final SFieldInteger BATCH_JOB = new SFieldInteger(PRODUCT, "BATCH_JOB");
+	public static final SFieldTimestamp CREATION_DATE = new SFieldTimestamp(PRODUCT, "CREATION_DATE");
+	public static final SFieldTimestamp LAST_UPDATED = new SFieldTimestamp(PRODUCT, "LAST_UPDATED");
 
 	public @Override()
 	SRecordMeta<AmazonProductDAO> getMeta() {

@@ -262,6 +262,7 @@ public class ProductManager {
 		int arraySize = pJSONArray.length();
 		SSessionJdbc ses = getSession();
 		// ses.setUseBatchUpdate(true);
+		Date now = new Date();
 		for (int i = 0; i < arraySize; i++) {
 			JSONObject upcProducts = pJSONArray.getJSONObject(i);
 			boolean amazonProductError = insertProductError(upcProducts);
@@ -282,12 +283,17 @@ public class ProductManager {
 						}
 						if (pUpdate) {
 							if (!productRow.isNewRow()) {
+								productRow.setTimestamp(AmazonProductDAO.LAST_UPDATED, now);
 								if (auditProductChanges(jsonProduct, productRow)) {
-									continue;
+									// continue;
 								}
 							} else {
 								logger.info("Found new ASIN: {} for Existing UPC: {}", asin, upc);
 							}
+						}
+						if (productRow.isNewRow()) {
+							productRow.setTimestamp(AmazonProductDAO.CREATION_DATE, now);
+							productRow.setTimestamp(AmazonProductDAO.LAST_UPDATED, now);
 						}
 
 						productRow.setString(AmazonProductDAO.UPC, upc);

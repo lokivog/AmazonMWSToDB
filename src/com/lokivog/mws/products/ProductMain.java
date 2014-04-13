@@ -37,14 +37,32 @@ public class ProductMain {
 		ProductMain productMain = new ProductMain();
 		// productMain.installProductsFromDropBox();
 		boolean update = true;
-		boolean ignoreRecentlyProcessed = false;
+		boolean ignoreRecentlyProcessed = true;
 		SLog.getSessionlessLogger().setLevel(0);
 		// productMain.runIds();
 		String idType = "ASIN";
+		// productMain.installProductsFromDropBox(update);
 		productMain.runFromFile(ignoreRecentlyProcessed, update, idType);
 		// productMain.getJSONProduct();
 		// productMain.installProductsFromLocalJSON(update);
 		// productMain.conertToJSON();
+		// productMain.dropAndCreateTables();
+	}
+
+	public void dropAndCreateTables() {
+		ProductManager pm = null;
+		try {
+			pm = new ProductManager(ProductScheduler.class.getSimpleName(), Constants.DROP_SHIP_SOURCE_kOLE);
+			if (pm.initDBConnection()) {
+				pm.dropTables();
+				pm.createTables();
+			}
+
+		} finally {
+			if (pm != null) {
+				pm.shutdownDB();
+			}
+		}
 	}
 
 	public void runIds(boolean pUpdate, String pIdType) {
@@ -158,7 +176,7 @@ public class ProductMain {
 	}
 
 	public void installProductsFromDropBox(boolean pUpdate) {
-		// runinstallProductsFromDropBoxScript();
+		runinstallProductsFromDropBoxScript();
 		String productsDir = StandaloneConfiguration.getInstance().getBuildProductsDir();
 		File folder = new File(productsDir);
 		for (final File fileEntry : folder.listFiles()) {
