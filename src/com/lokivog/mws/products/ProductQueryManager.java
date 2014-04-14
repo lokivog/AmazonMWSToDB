@@ -17,17 +17,20 @@ import simpleorm.sessionjdbc.SSessionJdbc;
 
 import com.lokivog.mws.dao.AmazonProductDAO;
 
-public class ProductsQueryManager {
+/**
+ * The Class ProductQueryManager is a utility class for performing DAO queries.
+ */
+public class ProductQueryManager {
 
-	final static Logger logger = LoggerFactory.getLogger(ProductsQueryManager.class);
+	final static Logger logger = LoggerFactory.getLogger(ProductQueryManager.class);
 	private ProductManager mProductManager;
 
-	public ProductsQueryManager() {
-		mProductManager = new ProductManager(ProductsQueryManager.class.getSimpleName());
+	public ProductQueryManager() {
+		mProductManager = new ProductManager(ProductQueryManager.class.getSimpleName());
 		mProductManager.initDBConnection();
 	}
 
-	public ProductsQueryManager(ProductManager pProductManager) {
+	public ProductQueryManager(ProductManager pProductManager) {
 		mProductManager = pProductManager;
 		if (!mProductManager.isConnectionEstablished()) {
 			mProductManager.initDBConnection();
@@ -39,8 +42,9 @@ public class ProductsQueryManager {
 	}
 
 	public JSONObject queryProductType(String pUPC, int pPackageQuantity, String pSkuId, String pDropShipSource) {
-		// getQueryText();
 		JSONObject jsonObject = null;
+		logger.debug("queryProductType: UPC: {}, pPackageQuantity: {}, pSkuId: {}, pDropShipSource: {}", pUPC,
+				pPackageQuantity, pSkuId, pDropShipSource);
 		SSessionJdbc ses = getProductManager().getSession();
 		try {
 			ses.begin();
@@ -48,8 +52,6 @@ public class ProductsQueryManager {
 					.eq(AmazonProductDAO.DROP_SHIP_SOURCE, pDropShipSource)
 					.eq(AmazonProductDAO.PACKAGEQUANTITY, pPackageQuantity);
 			List<SRecordInstance> products = ses.query(productQuery);
-			logger.info("Query for UPC: {}, PACKAGEQUANTITY: {}, result size: {}", pUPC, pPackageQuantity,
-					products.size());
 			if (!products.isEmpty()) {
 				if (products.size() == 1) {
 					jsonObject = new JSONObject();
@@ -78,11 +80,8 @@ public class ProductsQueryManager {
 							break;
 						}
 					}
-
 				}
-
 			}
-			// printQueryResults(products);
 		} finally {
 			if (ses != null) {
 				ses.commit();
@@ -100,7 +99,6 @@ public class ProductsQueryManager {
 					.rawQuery(
 							"select distinct(upc) as upc from amz_product where last_updated < '2014-04-13 01:20:05.629'",
 							true);
-			// printQueryResults(results);
 			if (results != null && results.size() > 0) {
 				upcs = new ArrayList<String>(results.size());
 				for (SRecordGeneric record : results) {
@@ -109,10 +107,7 @@ public class ProductsQueryManager {
 						String key = iter.next();
 						String value = (String) record.get(key);
 						upcs.add(value);
-
-						// logger.info("tier_pack_1: {}", object.names());
 					}
-
 				}
 			} else {
 				upcs = null;
@@ -127,7 +122,7 @@ public class ProductsQueryManager {
 	}
 
 	public static void main(String[] args) {
-		ProductsQueryManager pqm = new ProductsQueryManager();
+		ProductQueryManager pqm = new ProductQueryManager();
 		try {
 			pqm.getKoleProducts();
 		} finally {
@@ -144,7 +139,6 @@ public class ProductsQueryManager {
 					.rawQuery(
 							"select row_to_json(t) from (select brand,  upc, id as sku, item_weight as unit_weight, category, tier_pack_1, title, description from kole_products where inventory > 0) t;",
 							true);
-			// printQueryResults(results);
 			if (results != null && results.size() > 0) {
 				products = new ArrayList<JSONObject>(results.size());
 				for (SRecordGeneric record : results) {
@@ -153,12 +147,8 @@ public class ProductsQueryManager {
 						String key = iter.next();
 						PGobject value = (PGobject) record.get(key);
 						String jsonValue = value.getValue();
-						logger.info("value: {}", jsonValue);
 						JSONObject object = new JSONObject(jsonValue);
-						logger.info("adding record value: {}", object);
 						products.add(object);
-
-						// logger.info("tier_pack_1: {}", object.names());
 					}
 
 				}

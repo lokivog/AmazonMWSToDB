@@ -2,8 +2,8 @@ package com.lokivog.mws.products;
 
 import static com.lokivog.mws.Constants.FEATURE;
 import static com.lokivog.mws.Constants.OUTPUT_DIR;
-import static com.lokivog.mws.products.ProductScheduler.JSON_LOGGER;
-import static com.lokivog.mws.products.ProductScheduler.XML_LOGGER;
+import static com.lokivog.mws.products.ProductMain.JSON_LOGGER;
+import static com.lokivog.mws.products.ProductMain.XML_LOGGER;
 
 import java.io.File;
 import java.util.ArrayList;

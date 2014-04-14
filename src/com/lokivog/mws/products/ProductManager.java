@@ -74,10 +74,6 @@ public class ProductManager {
 		setSessionName(pSessionName);
 		setDropShipSource(DROP_SHIP_SOURCE_DEFAULT);
 		SLog.getSessionlessLogger().setLevel(0);
-		initDBConnection();
-		// Class.forName(DRIVER);
-		// connection = java.sql.DriverManager.getConnection("jdbc:hsqldb:hsqlTempFiles;shutdown=true;", "sa", "");
-
 	}
 
 	/**
@@ -89,11 +85,6 @@ public class ProductManager {
 	public ProductManager(String pSessionName, String pDropShipSource) {
 		setSessionName(pSessionName);
 		setDropShipSource(pDropShipSource);
-		SLog.getSessionlessLogger().setLevel(0);
-		// connection = java.sql.DriverManager.getConnection("jdbc:hsqldb:hsqlTempFiles;shutdown=true;", "sa", "");
-		// String url = "jdbc:postgresql://localhost/amazon";
-		// connection = java.sql.DriverManager.getConnection(url, "postgres", "postgres");
-
 	}
 
 	public boolean initDBConnection() {
