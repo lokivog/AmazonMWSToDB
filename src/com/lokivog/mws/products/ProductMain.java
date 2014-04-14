@@ -7,6 +7,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -39,8 +40,12 @@ public class ProductMain {
 		boolean update = true;
 		boolean ignoreRecentlyProcessed = true;
 		SLog.getSessionlessLogger().setLevel(0);
-		// productMain.runIds();
+		//
 		String idType = "ASIN";
+		// String idType = "UPC";
+		// String loadType = "db";
+		String loadType = "inline";
+		// productMain.runIds(update, idType, loadType);
 		// productMain.installProductsFromDropBox(update);
 		productMain.runFromFile(ignoreRecentlyProcessed, update, idType);
 		// productMain.getJSONProduct();
@@ -65,33 +70,22 @@ public class ProductMain {
 		}
 	}
 
-	public void runIds(boolean pUpdate, String pIdType) {
+	public void runIds(boolean pUpdate, String pIdType, String pLoadType) {
 		ProductManager pm = null;
 		try {
 			pm = new ProductManager(ProductScheduler.class.getSimpleName(), Constants.DROP_SHIP_SOURCE_kOLE);
 			if (pm.initDBConnection()) {
-				List<String> ids = new ArrayList<String>();
-				// ids.add("73101511064323433");
-				// ids.add("731015155644"); UPC from amazon that changed quantities
-				ids.add("731015110643");
-				ids.add("731015110650");
-				ids.add("731015110704");
-				ids.add("731015110810");
-				ids.add("731015109036");
-				ids.add("731015109302");
-				ids.add("731015109524");
-				ids.add("731015109777");
-				ids.add("731015110001");
-				ids.add("731015110032");
-				ids.add("731015110056");
-				ids.add("731015110063");
-				ids.add("731015110070");
-				ids.add("731015110582");
-				ids.add("731015110476");
-				ids.add("731015110797");
-				ids.add("731015110803");
-				ids.add("731015109456");
-				ids.add("731015109463");
+				List<String> ids = null;
+				if (pLoadType.equals("inline")) {
+					ids = new ArrayList<String>();
+					// ids.add("73101511064323433");
+					// ids.add("731015155644"); // UPC from amazon that changed quantities
+					ids.add("B00ENHR1SU");
+				} else if (pLoadType.equals("db")) {
+					ProductsQueryManager pqm = new ProductsQueryManager(pm);
+					ids = pqm.queryProductIdsToUpdate(new Date());
+				}
+
 				// ids = loadProductIds();
 
 				List<List<String>> subLists = MWSUtils.split(ids, Constants.MAX_PRODUCT_LOOKUP_SIZE);

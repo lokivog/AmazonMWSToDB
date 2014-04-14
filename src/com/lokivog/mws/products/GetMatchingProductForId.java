@@ -202,7 +202,7 @@ public class GetMatchingProductForId {
 			for (GetMatchingProductForIdResult getMatchingProductForIdResult : getMatchingProductForIdResultList) {
 				JSONObject object = new JSONObject();
 				if (getMatchingProductForIdResult.isSetId()) {
-					object.put(Constants.UPC, getMatchingProductForIdResult.getId());
+					object.put(Constants.ID, getMatchingProductForIdResult.getId());
 				}
 				if (getMatchingProductForIdResult.isSetIdType()) {
 					object.put(Constants.ID_TYPE, getMatchingProductForIdResult.getIdType());

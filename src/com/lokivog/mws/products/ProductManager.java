@@ -4,6 +4,7 @@ import static com.lokivog.mws.Constants.ASIN;
 import static com.lokivog.mws.Constants.DROP_SHIP_SOURCE_DEFAULT;
 import static com.lokivog.mws.Constants.FEATURE;
 import static com.lokivog.mws.Constants.FEATURE_LENGTH;
+import static com.lokivog.mws.Constants.ID;
 import static com.lokivog.mws.Constants.ID_TYPE;
 import static com.lokivog.mws.Constants.MARKET_PLACE_ID;
 import static com.lokivog.mws.Constants.STATUS;
@@ -15,7 +16,9 @@ import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -41,6 +44,8 @@ public class ProductManager {
 
 	public static final String DRIVER = "org.hsqldb.jdbcDriver";
 	public static final String POSTGRES_DRIVER = "org.postgresql.Driver";
+
+	public static final Set<String> IMMUTABLE_FIELDS = new HashSet<String>(Arrays.asList(ASIN, UPC, MARKET_PLACE_ID));
 
 	public static final SRecordMeta<?>[] TABLES = { AmazonProductDAO.PRODUCT, AmazonProductErrorDAO.PRODUCT_ERROR };
 	final Logger logger = LoggerFactory.getLogger(ProductManager.class);
@@ -224,14 +229,13 @@ public class ProductManager {
 	}
 
 	private List<String> filterExistingProducts(List<String> pProductUPCList, boolean pUpdate) {
-		List<String> productIds = new ArrayList<String>();
-		boolean success = false;
-		SSessionJdbc ses = getSession();
-		try {
-
-			ses.begin();
-			for (String upc : pProductUPCList) {
-				if (!pUpdate) {
+		List<String> productIds = new ArrayList<String>(pProductUPCList.size());
+		if (!pUpdate) {
+			boolean success = false;
+			SSessionJdbc ses = getSession();
+			try {
+				ses.begin();
+				for (String upc : pProductUPCList) {
 					SQuery<AmazonProductDAO> productQuery = new SQuery<AmazonProductDAO>(AmazonProductDAO.PRODUCT).eq(
 							AmazonProductDAO.UPC, upc).eq(AmazonProductDAO.DROP_SHIP_SOURCE, getDropShipSource());
 					List<AmazonProductDAO> products = ses.query(productQuery);
@@ -241,17 +245,17 @@ public class ProductManager {
 					} else {
 						logger.info("product already exist for upc: {}, source: {}", upc, getDropShipSource());
 					}
+				}
+				success = true;
+			} finally {
+				if (success) {
+					ses.commit();
 				} else {
-					productIds.add(upc);
+					ses.rollback();
 				}
 			}
-			success = true;
-		} finally {
-			if (success) {
-				ses.commit();
-			} else {
-				ses.rollback();
-			}
+		} else {
+			productIds.addAll(pProductUPCList);
 		}
 		return productIds;
 	}
@@ -265,6 +269,9 @@ public class ProductManager {
 		Date now = new Date();
 		for (int i = 0; i < arraySize; i++) {
 			JSONObject upcProducts = pJSONArray.getJSONObject(i);
+			String upcId = upcProducts.getString(ID);
+			String idType = upcProducts.getString(ID_TYPE);
+			String status = upcProducts.getString(STATUS);
 			boolean amazonProductError = insertProductError(upcProducts);
 			if (!amazonProductError) {
 				JSONArray products = upcProducts.getJSONArray("products");
@@ -272,42 +279,41 @@ public class ProductManager {
 				int size = products.length();
 				for (int j = 0; j < size; j++) {
 					JSONObject jsonProduct = products.getJSONObject(j);
-
 					String marketPlaceId = jsonProduct.getString(MARKET_PLACE_ID);
 					String asin = jsonProduct.getString(ASIN);
 					AmazonProductDAO productRow = ses.findOrCreate(AmazonProductDAO.PRODUCT, marketPlaceId, asin);
-					if (productRow.isNewRow() || pUpdate) {
-						String upc = upcProducts.getString(UPC);
-						if (!productRow.isNewRow() && pUpdate) {
-							logger.debug("Updating product: {}", asin);
-						}
-						if (pUpdate) {
-							if (!productRow.isNewRow()) {
-								productRow.setTimestamp(AmazonProductDAO.LAST_UPDATED, now);
-								if (auditProductChanges(jsonProduct, productRow)) {
-									// continue;
-								}
-							} else {
-								logger.info("Found new ASIN: {} for Existing UPC: {}", asin, upc);
+					boolean isNewRow = productRow.isNewRow();
+					if (isNewRow || pUpdate) {
+
+						if (isNewRow) {
+							if (pUpdate) {
+								logger.info("Found new ASIN: {} for Existing UPC: {}", asin, upcId);
 							}
-						}
-						if (productRow.isNewRow()) {
 							productRow.setTimestamp(AmazonProductDAO.CREATION_DATE, now);
+							productRow.setTimestamp(AmazonProductDAO.LAST_UPDATED, now);
+							productRow.setString(AmazonProductDAO.DROP_SHIP_SOURCE, getDropShipSource());
+							productRow.setString(AmazonProductDAO.ELASTICSEARCH_ID, marketPlaceId + "-" + asin);
+							if (idType.equals(UPC)) {
+								productRow.setString(AmazonProductDAO.UPC, upcId);
+							}
+						} else {
+							logger.debug("Updating product: {}", asin);
 							productRow.setTimestamp(AmazonProductDAO.LAST_UPDATED, now);
 						}
 
-						productRow.setString(AmazonProductDAO.UPC, upc);
-						productRow.setString(AmazonProductDAO.STATUS, upcProducts.getString(STATUS));
-						productRow.setString(AmazonProductDAO.ELASTICSEARCH_ID, marketPlaceId + "-" + asin);
-						productRow.setString(AmazonProductDAO.DROP_SHIP_SOURCE, getDropShipSource());
-
+						productRow.setString(AmazonProductDAO.STATUS, status);
 						JSONArray prodNames = jsonProduct.names();
+
 						int prodSize = prodNames.length();
 						for (int k = 0; k < prodSize; k++) {
 
 							String name = prodNames.getString(k);
 							String nameUpper = name.toUpperCase();
-							if (name.equalsIgnoreCase(ASIN) || name.equalsIgnoreCase(MARKET_PLACE_ID)) {
+							SFieldMeta field = productRow.getMeta().getField(nameUpper);
+							Object jsonValue = jsonProduct.get(name);
+
+							if (IMMUTABLE_FIELDS.contains(name)) {
+								auditProductChanges(isNewRow, asin, upcId, jsonValue, name, field, productRow);
 								// do not reset asin or marketplaceId, these represent primary keys of a product
 								continue;
 							} else if (name.equalsIgnoreCase(FEATURE)) {
@@ -316,16 +322,19 @@ public class ProductManager {
 									// trim feature to FEATURE_LENGTH to match DB column length
 									feature = feature.substring(0, FEATURE_LENGTH - 1);
 								}
-
-								productRow.setObject(productRow.getMeta().getField(nameUpper), feature);
+								if (auditProductChanges(isNewRow, asin, upcId, feature, name, field, productRow)) {
+									productRow.setObject(field, feature);
+								}
 							} else if (name.equalsIgnoreCase("ManufacturerPartsWarrantyDescription")) {
-								productRow.setString(AmazonProductDAO.ManufacturerPartsWarrantyDescription,
-										jsonProduct.getString(name));
+								if (auditProductChanges(isNewRow, asin, upcId, jsonValue, name,
+										AmazonProductDAO.ManufacturerPartsWarrantyDescription, productRow)) {
+									productRow.setString(AmazonProductDAO.ManufacturerPartsWarrantyDescription,
+											jsonProduct.getString(name));
+								}
 							} else {
 								try {
 									if (fieldNames.contains(nameUpper)) {
 										String value = jsonProduct.getString(name);
-										SFieldMeta field = productRow.getMeta().getField(nameUpper);
 										if (field instanceof SFieldString) {
 											int maxLength = ((SFieldScalar) field).getMaxSize();
 											if (value.length() > maxLength) {
@@ -336,16 +345,19 @@ public class ProductManager {
 											}
 
 										}
-										productRow.setObject(field, value);
+										if (auditProductChanges(isNewRow, asin, upcId, value, name, field, productRow)) {
+											productRow.setObject(field, value);
+										}
+
 									} else {
 										logger.warn("Column name does not exist for: {}, value: {}, UPC: {}, ASIN: {}",
-												nameUpper, jsonProduct.getString(name), upc, asin);
+												nameUpper, jsonProduct.getString(name), upcId, asin);
 									}
 
 								} catch (Exception e) {
 									logger.error(
 											"Error setting column on product UPC: {}, ASIN: {}: columnName: {}, columnValue: {}",
-											upc, asin, name, jsonProduct.getString(name));
+											upcId, asin, name, jsonProduct.getString(name));
 									throw new InsertException("Error inserting: " + name, e);
 								}
 							}
@@ -358,6 +370,65 @@ public class ProductManager {
 			}
 		}
 
+	}
+
+	private boolean auditProductChanges(boolean pIsNewRow, String pASIN, String pUPC, Object pJSONValue, String pName,
+			SFieldMeta pField, AmazonProductDAO pProductRow) {
+		boolean hasChanged = false;
+		if (pIsNewRow) {
+			hasChanged = true;
+			return hasChanged;
+		}
+		String nameUpper = pName.toUpperCase();
+		Object amazonValue = null;
+		if (pField == null) {
+			logger.info("Field: {} does not exist in Table", nameUpper);
+			return hasChanged;
+		} else {
+			amazonValue = pProductRow.getObject(pField);
+		}
+		if (pJSONValue != null && amazonValue == null) {
+			hasChanged = true;
+		} else if (amazonValue instanceof String) {
+			if (!pJSONValue.equals(amazonValue)) {
+				hasChanged = true;
+			}
+		} else if (amazonValue instanceof Integer) {
+			Integer amazonInt = (Integer) amazonValue;
+			Integer jsonInt = Integer.valueOf((String) pJSONValue);
+			if (!jsonInt.equals(amazonInt)) {
+				hasChanged = true;
+			}
+		} else if (amazonValue instanceof Double) {
+			Double amazonDbl = (Double) amazonValue;
+			Double jsonDbl = Double.valueOf((String) pJSONValue);
+			if (!jsonDbl.equals(amazonDbl)) {
+				hasChanged = true;
+			}
+		} else if (amazonValue instanceof Boolean) {
+			Boolean amazonBol = (Boolean) amazonValue;
+			Boolean jsonBol = Boolean.valueOf((String) pJSONValue);
+			if (!jsonBol.equals(amazonBol)) {
+				hasChanged = true;
+			}
+		} else {
+			if (!pJSONValue.equals(amazonValue)) {
+				hasChanged = true;
+				logger.info("jsonValue class: {}, value: {}", pJSONValue.getClass(), pJSONValue);
+				logger.info("amazonValue class: {}, value: {}", amazonValue.getClass(), amazonValue);
+			}
+		}
+		if (hasChanged) {
+			if (nameUpper.equals("PACKAGEQUANTITY")) {
+				logger.warn(
+						"LOGTYPE:{}, WARNING PACKAGEQUANTITY WAS UPDATED!! Deactivate Product now. Field: {}, was updated: {}!={} old=new value: for product ASIN: {}, UPC: {}",
+						"SELLER_UPDATE", pName, amazonValue, pJSONValue, pASIN, pUPC);
+			} else {
+				logger.info("LOGTYPE: {}, Field: {}, was updated, old/new: ({} != {}), for product ASIN: {}, UPC: {}",
+						"SELLER_UPDATE", pName, amazonValue, pJSONValue, pASIN, pUPC);
+			}
+		}
+		return hasChanged;
 	}
 
 	private boolean auditProductChanges(JSONObject pJsonProduct, AmazonProductDAO pProductRow) {
@@ -375,20 +446,16 @@ public class ProductManager {
 			Object amazonValue = null;
 			SFieldMeta field = pProductRow.getMeta().getField(nameUpper);
 			if (field == null) {
-				logger.error("Field: {} does not exist in Table", nameUpper);
+				logger.info("Field: {} does not exist in Table", nameUpper);
 				continue;
 			} else {
 				amazonValue = pProductRow.getObject(field);
 			}
 			if (jsonValue != null && amazonValue == null) {
 				hasChanged = true;
-				logger.info("Field: {}, was previously null, now has not value: {}, for ASIN: {}, UPC: {}", name,
-						jsonValue, asin, upc);
 			} else if (amazonValue instanceof String) {
 				if (!jsonValue.equals(amazonValue)) {
 					hasChanged = true;
-					logger.warn("Field: {}, was updated,  {}!={}, (old != new) value for product ASIN: {}, UPC: {}",
-							name, amazonValue, jsonValue, asin, upc);
 				}
 			} else if (amazonValue instanceof Integer) {
 				Integer amazonInt = (Integer) amazonValue;
@@ -396,12 +463,8 @@ public class ProductManager {
 				if (!jsonInt.equals(amazonInt)) {
 					if (nameUpper.equals("PACKAGEQUANTITY")) {
 						logger.warn(
-								"WARNING PACKAGEQUANTITY WAS UPDATED!! Deactivate Product now. Field: {}, was updated: {}!={} old=new value: for product ASIN: {}, UPC: {}",
-								name, amazonValue, jsonValue, asin, upc);
-					} else {
-						logger.warn(
-								"Field: {}, was updated,  {}!={}, (old != new) value for product ASIN: {}, UPC: {}",
-								name, amazonValue, jsonValue, asin, upc);
+								"LOGTYPE:{}, WARNING PACKAGEQUANTITY WAS UPDATED!! Deactivate Product now. Field: {}, was updated: {}!={} old=new value: for product ASIN: {}, UPC: {}",
+								"SELLER_UPDATE", name, amazonValue, jsonValue, asin, upc);
 					}
 					hasChanged = true;
 
@@ -411,25 +474,23 @@ public class ProductManager {
 				Double jsonDbl = Double.valueOf((String) jsonValue);
 				if (!jsonDbl.equals(amazonDbl)) {
 					hasChanged = true;
-					logger.warn("Field: {}, was updated,  {}!={}, (old != new) value for product ASIN: {}, UPC: {}",
-							name, amazonValue, jsonValue, asin, upc);
 				}
 			} else if (amazonValue instanceof Boolean) {
 				Boolean amazonBol = (Boolean) amazonValue;
 				Boolean jsonBol = Boolean.valueOf((String) jsonValue);
 				if (!jsonBol.equals(amazonBol)) {
 					hasChanged = true;
-					logger.warn("Field: {}, was updated,  {}!={}, (old != new) value for product ASIN: {}, UPC: {}",
-							name, amazonValue, jsonValue, asin, upc);
 				}
 			} else {
 				if (!jsonValue.equals(amazonValue)) {
 					hasChanged = true;
 					logger.info("jsonValue class: {}, value: {}", jsonValue.getClass(), jsonValue);
 					logger.info("amazonValue class: {}, value: {}", amazonValue.getClass(), amazonValue);
-					logger.warn("Field: {}, was updated,  {}!={}, (old != new) value for product ASIN: {}, UPC: {}",
-							name, amazonValue, jsonValue, asin, upc);
 				}
+			}
+			if (hasChanged) {
+				logger.warn("LOGTYPE: {}, Field: {}, was updated, old/new: ({} != {}), for product ASIN: {}, UPC: {}",
+						"SELLER_UPDATE", name, amazonValue, jsonValue, asin, upc);
 			}
 		}
 
@@ -441,7 +502,7 @@ public class ProductManager {
 		String amazonStatus = upcProducts.getString(STATUS);
 		if (!amazonStatus.equalsIgnoreCase(STATUS_SUCCESS)) {
 			isProductError = true;
-			String amazonUPC = upcProducts.getString(UPC);
+			String amazonUPC = upcProducts.getString(ID);
 			String amazonIdType = upcProducts.getString(ID_TYPE);
 			SSessionJdbc ses = getSession();
 			AmazonProductErrorDAO productError = ses.createWithGeneratedKey(AmazonProductErrorDAO.PRODUCT_ERROR);

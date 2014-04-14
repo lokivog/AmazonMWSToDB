@@ -7,7 +7,8 @@ public class Constants {
 	public static final String STATUS = "status";
 	public static final String STATUS_SUCCESS = "Success";
 	public static final String ES_ID = "elasticSearchId";
-	public static final String UPC = "id";
+	public static final String ID = "id";
+	public static final String UPC = "UPC";
 	public static final String ID_TYPE = "idType";
 	public static final String FEATURE = "Feature";
 	public static final String PRODUCTS = "products";

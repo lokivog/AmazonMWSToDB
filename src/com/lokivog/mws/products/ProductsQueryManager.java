@@ -1,6 +1,7 @@
 package com.lokivog.mws.products;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 
@@ -19,10 +20,18 @@ import com.lokivog.mws.dao.AmazonProductDAO;
 public class ProductsQueryManager {
 
 	final static Logger logger = LoggerFactory.getLogger(ProductsQueryManager.class);
-	private ProductManager mProductManager = new ProductManager(ProductsQueryManager.class.getSimpleName());
+	private ProductManager mProductManager;
 
 	public ProductsQueryManager() {
+		mProductManager = new ProductManager(ProductsQueryManager.class.getSimpleName());
 		mProductManager.initDBConnection();
+	}
+
+	public ProductsQueryManager(ProductManager pProductManager) {
+		mProductManager = pProductManager;
+		if (!mProductManager.isConnectionEstablished()) {
+			mProductManager.initDBConnection();
+		}
 	}
 
 	public void shutdown() {
@@ -80,6 +89,41 @@ public class ProductsQueryManager {
 			}
 		}
 		return jsonObject;
+	}
+
+	public List<String> queryProductIdsToUpdate(Date pLastUpdateBy) {
+		List<String> upcs;
+		SSessionJdbc ses = getProductManager().getSession();
+		try {
+			ses.begin();
+			List<SRecordGeneric> results = ses
+					.rawQuery(
+							"select distinct(upc) as upc from amz_product where last_updated < '2014-04-13 01:20:05.629'",
+							true);
+			// printQueryResults(results);
+			if (results != null && results.size() > 0) {
+				upcs = new ArrayList<String>(results.size());
+				for (SRecordGeneric record : results) {
+					Iterator<String> iter = record.keySet().iterator();
+					while (iter.hasNext()) {
+						String key = iter.next();
+						String value = (String) record.get(key);
+						upcs.add(value);
+
+						// logger.info("tier_pack_1: {}", object.names());
+					}
+
+				}
+			} else {
+				upcs = null;
+			}
+
+		} finally {
+			if (ses != null) {
+				ses.commit();
+			}
+		}
+		return upcs;
 	}
 
 	public static void main(String[] args) {
