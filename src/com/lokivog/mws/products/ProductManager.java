@@ -39,6 +39,7 @@ import simpleorm.utils.SLog;
 import com.lokivog.mws.config.StandaloneConfiguration;
 import com.lokivog.mws.dao.AmazonProductDAO;
 import com.lokivog.mws.dao.AmazonProductErrorDAO;
+import com.lokivog.mws.dao.SellerProductDAO;
 
 public class ProductManager {
 
@@ -47,7 +48,8 @@ public class ProductManager {
 
 	public static final Set<String> IMMUTABLE_FIELDS = new HashSet<String>(Arrays.asList(ASIN, UPC, MARKET_PLACE_ID));
 
-	public static final SRecordMeta<?>[] TABLES = { AmazonProductDAO.PRODUCT, AmazonProductErrorDAO.PRODUCT_ERROR };
+	public static final SRecordMeta<?>[] TABLES = { AmazonProductDAO.PRODUCT, AmazonProductErrorDAO.PRODUCT_ERROR,
+			SellerProductDAO.SELLER_PRODUCT };
 	final Logger logger = LoggerFactory.getLogger(ProductManager.class);
 
 	// database properties
@@ -138,6 +140,27 @@ public class ProductManager {
 				ses.rawUpdateDB(ses.getDriver().createTableSQL(table));
 				logger.info("Created table: {}", table.getTableName());
 			}
+			success = true;
+		} finally {
+			try {
+				if (success) {
+					ses.commit();
+				} else {
+					ses.rollback();
+				}
+			} catch (Exception e) {
+				logger.error("error ending transaction", e);
+			}
+		}
+	}
+
+	public void createTables(SRecordMeta pTable) {
+		SSessionJdbc ses = getSession();
+		boolean success = false;
+		try {
+			ses.begin();
+			ses.rawUpdateDB(ses.getDriver().createTableSQL(pTable));
+			logger.info("Created table: {}", pTable.getTableName());
 			success = true;
 		} finally {
 			try {
@@ -334,17 +357,14 @@ public class ProductManager {
 														asin, name, maxLength, value.length(), value);
 												value = value.substring(0, maxLength - 1);
 											}
-
 										}
 										if (auditProductChanges(isNewRow, asin, upcId, value, name, field, productRow)) {
 											productRow.setObject(field, value);
 										}
-
 									} else {
 										logger.warn("Column name does not exist for: {}, value: {}, UPC: {}, ASIN: {}",
 												nameUpper, jsonProduct.getString(name), upcId, asin);
 									}
-
 								} catch (Exception e) {
 									logger.error(
 											"Error setting column on product UPC: {}, ASIN: {}: columnName: {}, columnValue: {}",
@@ -506,6 +526,30 @@ public class ProductManager {
 			productError.setString(AmazonProductErrorDAO.ERRORTYPE, upcProducts.getString("errorType"));
 		}
 		return isProductError;
+	}
+
+	public boolean insertSellerProduct(List<AmazonProductDAO> pAmazonProducts) {
+		boolean success = false;
+		// String asin =
+		// AmazonProductDAO productRow = ses.findOrCreate(AmazonProductDAO.PRODUCT, marketPlaceId, asin);
+		SSessionJdbc ses = getSession();
+		try {
+			// s.begin();
+			for (AmazonProductDAO amazonProduct : pAmazonProducts) {
+				String marketPlaceId = amazonProduct.getString(AmazonProductDAO.MARKETPLACEID);
+				String asin = amazonProduct.getString(AmazonProductDAO.ASIN);
+				String upc = amazonProduct.getString(AmazonProductDAO.UPC);
+				Integer packageQauntity = amazonProduct.getInt(AmazonProductDAO.PACKAGEQUANTITY);
+				SellerProductDAO sellerProduct = ses.findOrCreate(SellerProductDAO.SELLER_PRODUCT, marketPlaceId, asin);
+				sellerProduct.setString(SellerProductDAO.UPC, upc);
+				sellerProduct.setInt(SellerProductDAO.PACKAGEQUANTITY, packageQauntity);
+				logger.info("adding seller product: {}", sellerProduct);
+			}
+		} catch (Exception e) {
+			logger.error("Error adding seller products", e);
+		}
+		success = true;
+		return success;
 	}
 
 	/**

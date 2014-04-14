@@ -25,4 +25,5 @@ public class Constants {
 	// table constants
 	public static final String TABLE_PRODUCT = "AMZ_PRODUCT";
 	public static final String TABLE_PRODUCT_ERROR = "AMZ_PRODUCT_ERROR";
+	public static final String TABLE_SELLER_PRODUCT = "SELLER_PRODUCT";
 }

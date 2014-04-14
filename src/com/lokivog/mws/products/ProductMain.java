@@ -20,11 +20,13 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import simpleorm.sessionjdbc.SSessionJdbc;
 import simpleorm.utils.SLog;
 
 import com.lokivog.mws.Constants;
 import com.lokivog.mws.MWSUtils;
 import com.lokivog.mws.config.StandaloneConfiguration;
+import com.lokivog.mws.dao.AmazonProductDAO;
 
 /**
  * The Class ProductMain is the main class for running AmazonMWSToDB.
@@ -38,7 +40,7 @@ public class ProductMain {
 	public static final String DEFAULT_ID_TXT_FILE = "input/ids.txt";
 
 	public static enum PROCESS_TYPE {
-		IDS("ids"), JSON("json"), TABLES("tables");
+		IDS("ids"), JSON("json"), TABLES("tables"), SELLER_PRODUCTS("seller");
 		private String mLoadType;
 
 		private PROCESS_TYPE(String pLoadType) {
@@ -104,7 +106,9 @@ public class ProductMain {
 		ProductMain productMain = new ProductMain();
 		SLog.getSessionlessLogger().setLevel(0);
 
-		String defaultProcessType = PROCESS_TYPE.IDS.getValue();
+		// String defaultProcessType = PROCESS_TYPE.TABLES.getValue();
+		// String defaultProcessType = PROCESS_TYPE.IDS.getValue();
+		String defaultProcessType = PROCESS_TYPE.SELLER_PRODUCTS.getValue();
 		// String defaultIdLoadType = ID_LOAD_TYPE.DATABASE.getValue();
 		String defaultIdLoadType = ID_LOAD_TYPE.INLINE_IDS.getValue();
 		String defaultIdType = "UPC"; // values are UPC or ASIN
@@ -128,6 +132,8 @@ public class ProductMain {
 			productMain.processJSON(loadType, defaultLocalJSONFile, defaultDropShipSource, update);
 		} else if (processType.equals(PROCESS_TYPE.TABLES.getValue())) {
 			productMain.dropAndCreateTables();
+		} else if (processType.equals(PROCESS_TYPE.SELLER_PRODUCTS.getValue())) {
+			productMain.installSellerProducts(defaultIdTxtFile, defaultDropShipSource);
 		}
 
 	}
@@ -139,8 +145,8 @@ public class ProductMain {
 			if (pm.initDBConnection()) {
 				pm.dropTables();
 				pm.createTables();
+				// pm.createTables(SellerProductDAO.SELLER_PRODUCT);
 			}
-
 		} finally {
 			if (pm != null) {
 				pm.shutdownDB();
@@ -324,6 +330,41 @@ public class ProductMain {
 			logger.error("Error loading file: " + pFileName, e);
 		}
 		return ids;
+	}
+
+	public void installSellerProducts(String pFileName, String pDropShipSource) {
+		List<String> productInfo = null;
+		try {
+			productInfo = FileUtils.readLines(new File(pFileName));
+		} catch (IOException e) {
+			logger.error("Error loading file: " + pFileName, e);
+		}
+		ProductManager pm = null;
+
+		try {
+			// ses.begin();
+			pm = new ProductManager(ProductScheduler.class.getSimpleName(), pDropShipSource);
+
+			if (pm.initDBConnection()) {
+				SSessionJdbc ses = pm.getSession();
+				ses.begin();
+				ProductQueryManager pqm = new ProductQueryManager(pm);
+				List<AmazonProductDAO> products = new ArrayList<AmazonProductDAO>(productInfo.size());
+				for (String line : productInfo) {
+					String[] info = line.split("\t");
+					AmazonProductDAO product = pqm.queryAmazonProduct(info[0], info[1]);
+					if (product != null) {
+						products.add(product);
+					}
+				}
+				pm.insertSellerProduct(products);
+				ses.commit();
+			}
+
+		} finally {
+			pm.shutdownDB();
+		}
+
 	}
 
 	private void installProductsFromDropBoxScript() {

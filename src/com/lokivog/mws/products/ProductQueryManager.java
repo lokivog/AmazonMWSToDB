@@ -63,6 +63,7 @@ public class ProductQueryManager {
 					jsonObject.put("upc", product.getString(AmazonProductDAO.UPC));
 					jsonObject.put("model", product.getString(AmazonProductDAO.MODEL));
 					jsonObject.put("productTypeName", product.getString(AmazonProductDAO.PRODUCTTYPENAME));
+					jsonObject.put("marketPlaceId", product.getString(AmazonProductDAO.MARKETPLACEID));
 				} else {
 					logger.warn(
 							"Found multiple products for UPC: {},  QUANTITY: {}, DROPSHIP: {}, products returned: {}, returning product with matching partnumber: {}. Must investigate",
@@ -77,6 +78,7 @@ public class ProductQueryManager {
 							jsonObject.put("upc", product.getString(AmazonProductDAO.UPC));
 							jsonObject.put("model", product.getString(AmazonProductDAO.MODEL));
 							jsonObject.put("productTypeName", product.getString(AmazonProductDAO.PRODUCTTYPENAME));
+							jsonObject.put("marketPlaceId", product.getString(AmazonProductDAO.MARKETPLACEID));
 							break;
 						}
 					}
@@ -119,6 +121,28 @@ public class ProductQueryManager {
 			}
 		}
 		return upcs;
+	}
+
+	public AmazonProductDAO queryAmazonProduct(String pMarketPlaceId, String pASIN) {
+		AmazonProductDAO product = null;
+		SSessionJdbc ses = getProductManager().getSession();
+		// ses.begin();
+		SQuery<AmazonProductDAO> productQuery = new SQuery<AmazonProductDAO>(AmazonProductDAO.PRODUCT).eq(
+				AmazonProductDAO.MARKETPLACEID, pMarketPlaceId).eq(AmazonProductDAO.ASIN, pASIN);
+		List<AmazonProductDAO> products = ses.query(productQuery);
+		logger.debug("products returned from query: " + products);
+		if (!products.isEmpty()) {
+			if (products.size() > 1) {
+				logger.info("returned multiple products for marketPlaceId: {}, ASIN: {}", pMarketPlaceId, pASIN);
+			} else {
+				product = products.get(0);
+			}
+
+		} else {
+			logger.info("product not found for marketPlaceId: {}, ASIN: {}", pMarketPlaceId, pASIN);
+		}
+		// ses.commit();
+		return product;
 	}
 
 	public static void main(String[] args) {
