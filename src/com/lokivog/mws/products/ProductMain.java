@@ -108,9 +108,11 @@ public class ProductMain {
 
 		// String defaultProcessType = PROCESS_TYPE.TABLES.getValue();
 		// String defaultProcessType = PROCESS_TYPE.IDS.getValue();
-		String defaultProcessType = PROCESS_TYPE.SELLER_PRODUCTS.getValue();
+		// String defaultProcessType = PROCESS_TYPE.SELLER_PRODUCTS.getValue();
+		String defaultProcessType = PROCESS_TYPE.JSON.getValue();
 		// String defaultIdLoadType = ID_LOAD_TYPE.DATABASE.getValue();
-		String defaultIdLoadType = ID_LOAD_TYPE.INLINE_IDS.getValue();
+		// String defaultIdLoadType = ID_LOAD_TYPE.INLINE_IDS.getValue();
+		String defaultIdLoadType = ID_LOAD_TYPE.TXT_FILE.getValue();
 		String defaultIdType = "UPC"; // values are UPC or ASIN
 		String defaultDropShipSource = Constants.DROP_SHIP_SOURCE_kOLE;
 		String defaultIdTxtFile = DEFAULT_ID_TXT_FILE;

@@ -161,7 +161,7 @@ public class ProductQueryManager {
 			ses.begin();
 			List<SRecordGeneric> results = ses
 					.rawQuery(
-							"select row_to_json(t) from (select brand,  upc, id as sku, item_weight as unit_weight, category, tier_pack_1, title, description from kole_products where inventory > 0) t;",
+							"select row_to_json(t) from (select brand,  upc, id as sku, item_weight as unit_weight, category, tier_pack_1, title, description from kole_products where inventory > 0 limit 5) t;",
 							true);
 			if (results != null && results.size() > 0) {
 				products = new ArrayList<JSONObject>(results.size());
