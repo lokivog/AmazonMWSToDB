@@ -5,7 +5,7 @@ create table kole_categories (
   CONSTRAINT kole_categories_p PRIMARY KEY (category_id)
 )
 		
-create table kole_products (
+create table kole_products2 (
  id	varchar(40),
  md5 varchar(60),
  title character varying,

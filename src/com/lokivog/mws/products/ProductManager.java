@@ -11,10 +11,6 @@ import static com.lokivog.mws.Constants.STATUS;
 import static com.lokivog.mws.Constants.STATUS_SUCCESS;
 import static com.lokivog.mws.Constants.UPC;
 
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -32,16 +28,18 @@ import simpleorm.dataset.SFieldScalar;
 import simpleorm.dataset.SFieldString;
 import simpleorm.dataset.SQuery;
 import simpleorm.dataset.SQueryResult;
+import simpleorm.dataset.SRecordInstance;
 import simpleorm.dataset.SRecordMeta;
 import simpleorm.sessionjdbc.SSessionJdbc;
 import simpleorm.utils.SLog;
 
-import com.lokivog.mws.config.StandaloneConfiguration;
+import com.lokivog.mws.Constants;
 import com.lokivog.mws.dao.AmazonProductDAO;
 import com.lokivog.mws.dao.AmazonProductErrorDAO;
+import com.lokivog.mws.dao.DAOManager;
 import com.lokivog.mws.dao.SellerProductDAO;
 
-public class ProductManager {
+public class ProductManager extends DAOManager {
 
 	public static final String DRIVER = "org.hsqldb.jdbcDriver";
 	public static final String POSTGRES_DRIVER = "org.postgresql.Driver";
@@ -52,19 +50,14 @@ public class ProductManager {
 			SellerProductDAO.SELLER_PRODUCT };
 	final Logger logger = LoggerFactory.getLogger(ProductManager.class);
 
-	// database properties
-	private Connection connection = null;
-	private String mDriverName;
-
-	/** The Session name for the SimpleDAO connection session object. */
-	private String mSessionName;
+	private ProductQueryManager mProductQueryManager;
 
 	/** The Drop ship source name to identify the dropship vendor the product originated from. */
 	private String mDropShipSource;
 
 	private Date mStartDate = new Date();
 
-	private boolean mConnectionEstablished = false;
+	private int mBatchNumber;
 
 	/**
 	 * Instantiates a new product manager with a name for the SimpleDAO session object. If used the dropShipSource is set to
@@ -73,9 +66,10 @@ public class ProductManager {
 	 * @param pSessionName the session name
 	 */
 	public ProductManager(String pSessionName) {
-		setSessionName(pSessionName);
+		super(pSessionName);
 		setDropShipSource(DROP_SHIP_SOURCE_DEFAULT);
 		SLog.getSessionlessLogger().setLevel(0);
+		mProductQueryManager = new ProductQueryManager(this);
 	}
 
 	/**
@@ -85,127 +79,10 @@ public class ProductManager {
 	 * @param pDropShipSource the drop ship source
 	 */
 	public ProductManager(String pSessionName, String pDropShipSource) {
-		setSessionName(pSessionName);
+		super(pSessionName);
+		SLog.getSessionlessLogger().setLevel(0);
 		setDropShipSource(pDropShipSource);
-	}
-
-	public boolean initDBConnection() {
-		boolean success = false;
-		String url = null;
-		String userName = null;
-		FileInputStream in = null;
-		try {
-			StandaloneConfiguration sc = StandaloneConfiguration.getInstance();
-			url = sc.getDBURL();
-			userName = sc.getDBUserName();
-			String pswd = sc.getDBPassword();
-			setDriverName(sc.getDBDriver());
-			logger.debug("db.url: {}, db.username: {}, db.driver: {}", sc.getDBURL(), userName, getDriverName());
-			Class.forName(getDriverName());
-			logger.info("opening connection for database: {}", url);
-			connection = java.sql.DriverManager.getConnection(url, userName, pswd);
-			success = true;
-			setConnectionEstablished(true);
-		} catch (ClassNotFoundException e) {
-			logger.error("Driver class not found for: " + DRIVER, e);
-		} catch (SQLException e) {
-			logger.error("Error getting connection for: db.url: " + url + ", db.username: " + userName + ", driver: "
-					+ getDriverName(), e);
-		} finally {
-			if (in != null) {
-				try {
-					in.close();
-				} catch (IOException e) {
-					logger.error("Error closing connection", e);
-				}
-			}
-		}
-		return success;
-	}
-
-	public void shutdownDB() {
-		if (connection != null) {
-			logger.info("Closing connection to database for session: {}", getSession());
-			SSessionJdbc ses = getSession();
-			ses.close();
-		}
-	}
-
-	public void createTables() {
-		SSessionJdbc ses = getSession();
-		boolean success = false;
-		try {
-			ses.begin();
-			for (SRecordMeta<?> table : TABLES) {
-				ses.rawUpdateDB(ses.getDriver().createTableSQL(table));
-				logger.info("Created table: {}", table.getTableName());
-			}
-			success = true;
-		} finally {
-			try {
-				if (success) {
-					ses.commit();
-				} else {
-					ses.rollback();
-				}
-			} catch (Exception e) {
-				logger.error("error ending transaction", e);
-			}
-		}
-	}
-
-	public void createTables(SRecordMeta pTable) {
-		SSessionJdbc ses = getSession();
-		boolean success = false;
-		try {
-			ses.begin();
-			ses.rawUpdateDB(ses.getDriver().createTableSQL(pTable));
-			logger.info("Created table: {}", pTable.getTableName());
-			success = true;
-		} finally {
-			try {
-				if (success) {
-					ses.commit();
-				} else {
-					ses.rollback();
-				}
-			} catch (Exception e) {
-				logger.error("error ending transaction", e);
-			}
-		}
-	}
-
-	public void dropTables() {
-		SSessionJdbc ses = getSession();
-		boolean success = false;
-		try {
-			ses.begin();
-			for (SRecordMeta<?> table : TABLES) {
-				String tableName = table.getTableName();
-				ses.getDriver().dropTableNoError(tableName);
-				logger.info("Drop table: {}", tableName);
-			}
-			success = true;
-		} finally {
-			try {
-				if (success) {
-					ses.commit();
-				} else {
-					ses.rollback();
-				}
-			} catch (Exception e) {
-				logger.error("error ending transaction", e);
-			}
-
-		}
-	}
-
-	public SSessionJdbc getSession() {
-		SSessionJdbc ses = SSessionJdbc.getThreadLocalSession();
-		if (ses == null) {
-			ses = SSessionJdbc.open(connection, getSessionName());
-		}
-		return ses;
+		mProductQueryManager = new ProductQueryManager(this);
 	}
 
 	public void findAndInsertProducts(List<String> pProductUPCList, boolean pUpdate, String pIdType) {
@@ -233,8 +110,10 @@ public class ProductManager {
 		} finally {
 			if (ses != null) {
 				if (!success) {
+					logger.debug("insertJSONProducts: bulkInsert failed, rolling back transaction");
 					ses.rollback();
 				} else {
+					logger.debug("insertJSONProducts: bulkInsert success, commiting transaction");
 					ses.commit();
 				}
 			}
@@ -296,6 +175,7 @@ public class ProductManager {
 					String marketPlaceId = jsonProduct.getString(MARKET_PLACE_ID);
 					String asin = jsonProduct.getString(ASIN);
 					AmazonProductDAO productRow = ses.findOrCreate(AmazonProductDAO.PRODUCT, marketPlaceId, asin);
+					productRow.setInt(AmazonProductDAO.BATCH_JOB, getBatchNumber());
 					boolean isNewRow = productRow.isNewRow();
 					if (isNewRow || pUpdate) {
 
@@ -311,10 +191,12 @@ public class ProductManager {
 								productRow.setString(AmazonProductDAO.UPC, upcId);
 							}
 						} else {
-							logger.debug("Updating product: {}", asin);
+							if (idType.equalsIgnoreCase(ASIN)) {
+								upcId = productRow.getString(AmazonProductDAO.UPC);
+							}
+							logger.debug("Updating product: {} with LAST_UPDATED: {}", asin, now);
 							productRow.setTimestamp(AmazonProductDAO.LAST_UPDATED, now);
 						}
-
 						productRow.setString(AmazonProductDAO.STATUS, status);
 						JSONArray prodNames = jsonProduct.names();
 
@@ -327,7 +209,7 @@ public class ProductManager {
 							Object jsonValue = jsonProduct.get(name);
 
 							if (IMMUTABLE_FIELDS.contains(name)) {
-								auditProductChanges(isNewRow, asin, upcId, jsonValue, name, field, productRow);
+								auditProductChanges(isNewRow, asin, upcId, jsonValue, name, productRow);
 								// do not reset asin or marketplaceId, these represent primary keys of a product
 								continue;
 							} else if (name.equalsIgnoreCase(FEATURE)) {
@@ -336,12 +218,11 @@ public class ProductManager {
 									// trim feature to FEATURE_LENGTH to match DB column length
 									feature = feature.substring(0, FEATURE_LENGTH - 1);
 								}
-								if (auditProductChanges(isNewRow, asin, upcId, feature, name, field, productRow)) {
+								if (auditProductChanges(isNewRow, asin, upcId, feature, name, productRow)) {
 									productRow.setObject(field, feature);
 								}
 							} else if (name.equalsIgnoreCase("ManufacturerPartsWarrantyDescription")) {
-								if (auditProductChanges(isNewRow, asin, upcId, jsonValue, name,
-										AmazonProductDAO.ManufacturerPartsWarrantyDescription, productRow)) {
+								if (auditProductChanges(isNewRow, asin, upcId, jsonValue, name, productRow)) {
 									productRow.setString(AmazonProductDAO.ManufacturerPartsWarrantyDescription,
 											jsonProduct.getString(name));
 								}
@@ -358,7 +239,7 @@ public class ProductManager {
 												value = value.substring(0, maxLength - 1);
 											}
 										}
-										if (auditProductChanges(isNewRow, asin, upcId, value, name, field, productRow)) {
+										if (auditProductChanges(isNewRow, asin, upcId, value, name, productRow)) {
 											productRow.setObject(field, value);
 										}
 									} else {
@@ -384,59 +265,28 @@ public class ProductManager {
 	}
 
 	private boolean auditProductChanges(boolean pIsNewRow, String pASIN, String pUPC, Object pJSONValue, String pName,
-			SFieldMeta pField, AmazonProductDAO pProductRow) {
+			SRecordInstance pProductRow) {
 		boolean hasChanged = false;
 		if (pIsNewRow) {
 			hasChanged = true;
 			return hasChanged;
 		}
-		String nameUpper = pName.toUpperCase();
-		Object amazonValue = null;
-		if (pField == null) {
-			logger.info("Field: {} does not exist in Table", nameUpper);
-			return hasChanged;
-		} else {
-			amazonValue = pProductRow.getObject(pField);
-		}
-		if (pJSONValue != null && amazonValue == null) {
-			hasChanged = true;
-		} else if (amazonValue instanceof String) {
-			if (!pJSONValue.equals(amazonValue)) {
-				hasChanged = true;
-			}
-		} else if (amazonValue instanceof Integer) {
-			Integer amazonInt = (Integer) amazonValue;
-			Integer jsonInt = Integer.valueOf((String) pJSONValue);
-			if (!jsonInt.equals(amazonInt)) {
-				hasChanged = true;
-			}
-		} else if (amazonValue instanceof Double) {
-			Double amazonDbl = (Double) amazonValue;
-			Double jsonDbl = Double.valueOf((String) pJSONValue);
-			if (!jsonDbl.equals(amazonDbl)) {
-				hasChanged = true;
-			}
-		} else if (amazonValue instanceof Boolean) {
-			Boolean amazonBol = (Boolean) amazonValue;
-			Boolean jsonBol = Boolean.valueOf((String) pJSONValue);
-			if (!jsonBol.equals(amazonBol)) {
-				hasChanged = true;
-			}
-		} else {
-			if (!pJSONValue.equals(amazonValue)) {
-				hasChanged = true;
-				logger.info("jsonValue class: {}, value: {}", pJSONValue.getClass(), pJSONValue);
-				logger.info("amazonValue class: {}, value: {}", amazonValue.getClass(), amazonValue);
-			}
-		}
+		hasChanged = super.auditDAOChanges(pIsNewRow, pASIN, pJSONValue, pName, pProductRow);
 		if (hasChanged) {
-			if (nameUpper.equals("PACKAGEQUANTITY")) {
+			String nameUpper = pName.toUpperCase();
+			SFieldMeta daoField = pProductRow.getMeta().getField(nameUpper);
+			if (daoField == null) {
+				logger.info("Field: {} does not exist in Table", pName);
+				return hasChanged;
+			}
+			Object daoValue = pProductRow.getObject(daoField);
+			if (pName.equalsIgnoreCase("PACKAGEQUANTITY")) {
 				logger.warn(
 						"LOGTYPE:{}, WARNING PACKAGEQUANTITY WAS UPDATED!! Deactivate Product now. Field: {}, was updated: {}!={} old=new value: for product ASIN: {}, UPC: {}",
-						"SELLER_UPDATE", pName, amazonValue, pJSONValue, pASIN, pUPC);
+						"SELLER_UPDATE", nameUpper, daoValue, pJSONValue, pASIN, pUPC);
 			} else {
-				logger.info("LOGTYPE: {}, Field: {}, was updated, old/new: ({} != {}), for product ASIN: {}, UPC: {}",
-						"SELLER_UPDATE", pName, amazonValue, pJSONValue, pASIN, pUPC);
+				logger.info("LOGTYPE: {}, Field: {}, was updated, old/new: ({} != {}), for product ASIN: {} UPC: {}",
+						"SELLER_UPDATE", pName, daoValue, pJSONValue, pASIN, pUPC);
 			}
 		}
 		return hasChanged;
@@ -474,7 +324,7 @@ public class ProductManager {
 				if (!jsonInt.equals(amazonInt)) {
 					if (nameUpper.equals("PACKAGEQUANTITY")) {
 						logger.warn(
-								"LOGTYPE:{}, WARNING PACKAGEQUANTITY WAS UPDATED!! Deactivate Product now. Field: {}, was updated: {}!={} old=new value: for product ASIN: {}, UPC: {}",
+								"LOGTYPE: {}, WARNING PACKAGEQUANTITY WAS UPDATED!! Deactivate Product now. Field: {}, was updated: {}!={} old=new value: for product ASIN: {}, UPC: {}",
 								"SELLER_UPDATE", name, amazonValue, jsonValue, asin, upc);
 					}
 					hasChanged = true;
@@ -513,28 +363,35 @@ public class ProductManager {
 		String amazonStatus = upcProducts.getString(STATUS);
 		if (!amazonStatus.equalsIgnoreCase(STATUS_SUCCESS)) {
 			isProductError = true;
-			String amazonUPC = upcProducts.getString(ID);
+			String amazonId = upcProducts.getString(ID);
 			String amazonIdType = upcProducts.getString(ID_TYPE);
 			SSessionJdbc ses = getSession();
 			AmazonProductErrorDAO productError = ses.createWithGeneratedKey(AmazonProductErrorDAO.PRODUCT_ERROR);
-			productError.setString(AmazonProductErrorDAO.UPC, amazonUPC);
+			productError.setString(AmazonProductErrorDAO.UPC, amazonId);
 			productError.setString(AmazonProductErrorDAO.ID_TYPE, amazonIdType);
 			productError.setString(AmazonProductErrorDAO.STATUS, amazonStatus);
 			productError.setString(AmazonProductErrorDAO.DROP_SHIP_SOURCE, getDropShipSource());
 			productError.setObject(AmazonProductErrorDAO.JSON, upcProducts);
 			productError.setString(AmazonProductErrorDAO.ERRORMESSAGE, upcProducts.getString("errorMessage"));
 			productError.setString(AmazonProductErrorDAO.ERRORTYPE, upcProducts.getString("errorType"));
+
+			if (amazonIdType.equalsIgnoreCase(ASIN)) {
+				AmazonProductDAO productRow = mProductQueryManager.queryAmazonProductByASIN(amazonId);
+				if (productRow != null) {
+					productRow.setString(AmazonProductDAO.STATUS, amazonStatus);
+					productRow.setInt(AmazonProductDAO.BATCH_JOB, getBatchNumber());
+					productRow.setDate(AmazonProductDAO.LAST_UPDATED, new Date());
+				}
+			}
 		}
 		return isProductError;
 	}
 
-	public boolean insertSellerProduct(List<AmazonProductDAO> pAmazonProducts) {
+	public boolean insertSellerProduct(List<AmazonProductDAO> pAmazonProducts, String pType) {
 		boolean success = false;
-		// String asin =
-		// AmazonProductDAO productRow = ses.findOrCreate(AmazonProductDAO.PRODUCT, marketPlaceId, asin);
 		SSessionJdbc ses = getSession();
 		try {
-			// s.begin();
+			ses.begin();
 			for (AmazonProductDAO amazonProduct : pAmazonProducts) {
 				String marketPlaceId = amazonProduct.getString(AmazonProductDAO.MARKETPLACEID);
 				String asin = amazonProduct.getString(AmazonProductDAO.ASIN);
@@ -545,10 +402,58 @@ public class ProductManager {
 				sellerProduct.setInt(SellerProductDAO.PACKAGEQUANTITY, packageQauntity);
 				logger.info("adding seller product: {}", sellerProduct);
 			}
+			success = true;
 		} catch (Exception e) {
 			logger.error("Error adding seller products", e);
+		} finally {
+			if (ses != null) {
+				if (success) {
+					ses.commit();
+				} else {
+					ses.rollback();
+				}
+			}
 		}
-		success = true;
+
+		return success;
+	}
+
+	public boolean insertSellerProduct(List<JSONObject> pJSONObjects) {
+		boolean success = false;
+		SSessionJdbc ses = getSession();
+		Date now = new Date();
+		try {
+			ses.begin();
+			logger.info("insertSellerProduct: inserting: {} products into table seller_product", pJSONObjects.size());
+			for (JSONObject jsonObject : pJSONObjects) {
+				String marketPlaceId = jsonObject.getString(MARKET_PLACE_ID);
+				String asin = jsonObject.getString(ASIN);
+				String upc = jsonObject.getString(UPC);
+				int inventory = jsonObject.getInt("inventory");
+				Integer packageQauntity = jsonObject.getInt(Constants.PACKAGE_QUANTITY);
+				SellerProductDAO sellerProduct = ses.findOrCreate(SellerProductDAO.SELLER_PRODUCT, marketPlaceId, asin);
+				sellerProduct.setString(SellerProductDAO.UPC, upc);
+				sellerProduct.setInt(SellerProductDAO.PACKAGEQUANTITY, packageQauntity);
+				sellerProduct.setInt(SellerProductDAO.INVENTORY, inventory);
+				if (sellerProduct.isNewRow()) {
+					sellerProduct.setDate(SellerProductDAO.CREATION_DATE, now);
+				}
+				sellerProduct.setDate(SellerProductDAO.UPLOADED_DATE, now);
+				logger.debug("adding seller product: {}", sellerProduct);
+			}
+			success = true;
+		} catch (Exception e) {
+			logger.error("Error adding seller products", e);
+		} finally {
+			if (ses != null) {
+				if (success) {
+					ses.commit();
+				} else {
+					ses.rollback();
+				}
+			}
+		}
+
 		return success;
 	}
 
@@ -578,28 +483,11 @@ public class ProductManager {
 		mDropShipSource = pDropShipSource;
 	}
 
-	public String getSessionName() {
-		return mSessionName;
+	public int getBatchNumber() {
+		return mBatchNumber;
 	}
 
-	public void setSessionName(String pSessionName) {
-		mSessionName = pSessionName;
+	public void setBatchNumber(int pBatchNumber) {
+		mBatchNumber = pBatchNumber;
 	}
-
-	public String getDriverName() {
-		return mDriverName;
-	}
-
-	public void setDriverName(String pDriverName) {
-		mDriverName = pDriverName;
-	}
-
-	public boolean isConnectionEstablished() {
-		return mConnectionEstablished;
-	}
-
-	public void setConnectionEstablished(boolean pConnectionEstablished) {
-		mConnectionEstablished = pConnectionEstablished;
-	}
-
 }

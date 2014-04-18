@@ -106,27 +106,32 @@ public class ProductMain {
 		ProductMain productMain = new ProductMain();
 		SLog.getSessionlessLogger().setLevel(0);
 
+		// TODO get product category from request
+
 		// String defaultProcessType = PROCESS_TYPE.TABLES.getValue();
-		// String defaultProcessType = PROCESS_TYPE.IDS.getValue();
+		String defaultProcessType = PROCESS_TYPE.IDS.getValue();
 		// String defaultProcessType = PROCESS_TYPE.SELLER_PRODUCTS.getValue();
-		String defaultProcessType = PROCESS_TYPE.JSON.getValue();
-		// String defaultIdLoadType = ID_LOAD_TYPE.DATABASE.getValue();
+		// String defaultProcessType = PROCESS_TYPE.JSON.getValue();
+		String defaultIdLoadType = ID_LOAD_TYPE.DATABASE.getValue();
 		// String defaultIdLoadType = ID_LOAD_TYPE.INLINE_IDS.getValue();
-		String defaultIdLoadType = ID_LOAD_TYPE.TXT_FILE.getValue();
+		// String defaultIdLoadType = ID_LOAD_TYPE.TXT_FILE.getValue();
 		String defaultIdType = "UPC"; // values are UPC or ASIN
+		// String defaultIdType = "ASIN";
 		String defaultDropShipSource = Constants.DROP_SHIP_SOURCE_kOLE;
 		String defaultIdTxtFile = DEFAULT_ID_TXT_FILE;
-		String defaultLocalJSONFile = DEFAULT_LOCAL_JSON_FILE;
+		// String defaultLocalJSONFile = DEFAULT_LOCAL_JSON_FILE;
+		String defaultLocalJSONFile = "output/json";
 		String defaultJSONLoadType = JSON_LOAD_TYPE.LOCAL.getValue();
 
 		boolean update = true;
-		boolean ignoreRecentlyProcessed = true;
+		boolean ignoreRecentlyProcessed = false;
 
 		// TODO allow override args to be passed in via command line args
 		String processType = defaultProcessType;
 
 		if (processType.equals(PROCESS_TYPE.IDS.getValue())) {
 			ID_LOAD_TYPE loadType = ID_LOAD_TYPE.getIdLoadType(defaultIdLoadType);
+			logger.info("idLoadType: " + loadType);
 			productMain.processIds(loadType, defaultIdType, defaultDropShipSource, defaultIdTxtFile, update,
 					ignoreRecentlyProcessed, defaultLocalJSONFile);
 		} else if (processType.equals(PROCESS_TYPE.JSON.getValue())) {
@@ -145,8 +150,8 @@ public class ProductMain {
 		try {
 			pm = new ProductManager(ProductScheduler.class.getSimpleName(), Constants.DROP_SHIP_SOURCE_kOLE);
 			if (pm.initDBConnection()) {
-				pm.dropTables();
-				pm.createTables();
+				pm.dropTables(ProductManager.TABLES);
+				pm.createTables(ProductManager.TABLES);
 				// pm.createTables(SellerProductDAO.SELLER_PRODUCT);
 			}
 		} finally {
@@ -210,16 +215,21 @@ public class ProductMain {
 					}
 					case DATABASE: {
 						ProductQueryManager pqm = new ProductQueryManager(pm);
-						ids = pqm.queryProductIdsToUpdate(new Date());
+						ids = pqm.queryProductIdsToUpdate(new Date(), pIdType);
+						logger.info("Ids : " + ids);
+						break;
 					}
 					case TXT_FILE: {
 						ids = loadIdsFromTxtFile(pTxtFileName);
+						break;
 					}
 					default: {
 						logger.info("processIds: no ID_LOAD_TYPE was selected. Program will exit");
 						break;
 					}
 				}
+				int batchNumber = 3;
+				pm.setBatchNumber(batchNumber);
 				if (ids != null && !ids.isEmpty()) {
 					if (!pIgnoreRecentlyProcessed) {
 						int sizeBefore = ids.size();
@@ -227,8 +237,9 @@ public class ProductMain {
 						RecentlyDownloadedPredicate recentlyDownloadedPredicate = new RecentlyDownloadedPredicate(
 								products);
 						CollectionUtils.filter(ids, recentlyDownloadedPredicate);
-						logger.info("filtered out recently processed ids. Before size: {}, after size: {}", sizeBefore,
-								ids.size());
+						logger.info(
+								"filtered out recently processed ids from productId List size: {}, Before size: {}, after size: {}",
+								products.size(), sizeBefore, ids.size());
 					}
 					if (!ids.isEmpty()) {
 						List<List<String>> subLists = MWSUtils.split(ids, Constants.MAX_PRODUCT_LOOKUP_SIZE);
@@ -359,7 +370,7 @@ public class ProductMain {
 						products.add(product);
 					}
 				}
-				pm.insertSellerProduct(products);
+				// pm.insertSellerProduct(products);
 				ses.commit();
 			}
 
@@ -452,11 +463,35 @@ public class ProductMain {
 	}
 
 	private Set<String> loadProductIdsFromJSON(String pFile) {
+		Set<String> productIds = new HashSet<String>();
+		int count = 1;
+		try {
+			logger.info("loadProductIdsFromJSON from file: {}", pFile);
+			File file = new File(pFile);
+			if (file.isDirectory()) {
+				for (final File fileEntry : file.listFiles()) {
+					if (fileEntry.isDirectory()) {
+						listFilesForFolder(fileEntry);
+					} else {
+						productIds.addAll(loadProductIdsFromJSON(fileEntry));
+					}
+				}
+			} else {
+				productIds.addAll(loadProductIdsFromJSON(file));
+			}
+
+		} catch (JSONException e) {
+			logger.error("JSONException processing line: {}", count, e);
+		}
+		return productIds;
+	}
+
+	private Set<String> loadProductIdsFromJSON(File pFile) {
 		Set<String> productIds = null;
 		int count = 1;
 		try {
 			logger.info("loadProductIdsFromJSON from file: {}", pFile);
-			List<String> lines = FileUtils.readLines(new File(pFile));
+			List<String> lines = FileUtils.readLines(pFile);
 			productIds = new HashSet<String>(lines.size());
 			for (String line : lines) {
 				JSONObject object = new JSONObject(line);
@@ -465,6 +500,7 @@ public class ProductMain {
 				}
 				count++;
 			}
+
 		} catch (JSONException e) {
 			logger.error("JSONException processing line: {}", count, e);
 		} catch (IOException e) {

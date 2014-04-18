@@ -27,14 +27,10 @@ public class ProductQueryManager {
 
 	public ProductQueryManager() {
 		mProductManager = new ProductManager(ProductQueryManager.class.getSimpleName());
-		mProductManager.initDBConnection();
 	}
 
 	public ProductQueryManager(ProductManager pProductManager) {
 		mProductManager = pProductManager;
-		if (!mProductManager.isConnectionEstablished()) {
-			mProductManager.initDBConnection();
-		}
 	}
 
 	public void shutdown() {
@@ -92,28 +88,36 @@ public class ProductQueryManager {
 		return jsonObject;
 	}
 
-	public List<String> queryProductIdsToUpdate(Date pLastUpdateBy) {
-		List<String> upcs;
+	public List<String> queryProductIdsToUpdate(Date pLastUpdateBy, String pIdType) {
+		List<String> upcs = null;
 		SSessionJdbc ses = getProductManager().getSession();
 		try {
-			ses.begin();
-			List<SRecordGeneric> results = ses
-					.rawQuery(
-							"select distinct(upc) as upc from amz_product where last_updated < '2014-04-13 01:20:05.629'",
-							true);
-			if (results != null && results.size() > 0) {
-				upcs = new ArrayList<String>(results.size());
-				for (SRecordGeneric record : results) {
-					Iterator<String> iter = record.keySet().iterator();
-					while (iter.hasNext()) {
-						String key = iter.next();
-						String value = (String) record.get(key);
-						upcs.add(value);
-					}
-				}
-			} else {
-				upcs = null;
+			String query = null;
+			if (pIdType.equals("UPC")) {
+				// query = "select distinct(upc) as upc from amz_product where last_updated < '2014-04-17 01:20:05.629' and batch_job < 4";
+				query = "select distinct(upc) as upc from amz_product where batch_job < 4";
+			} else if (pIdType.equals("ASIN")) {
+				query = "select asin from amz_product where last_updated < '2014-04-17 01:20:05.629' and batch_job < 2";
 			}
+			if (query != null) {
+				ses.begin();
+				List<SRecordGeneric> results = ses.rawQuery(query, true);
+				if (results != null && results.size() > 0) {
+					upcs = new ArrayList<String>(results.size());
+					for (SRecordGeneric record : results) {
+						Iterator<String> iter = record.keySet().iterator();
+						while (iter.hasNext()) {
+							String key = iter.next();
+							String value = (String) record.get(key);
+							upcs.add(value);
+						}
+					}
+				} else {
+					upcs = null;
+				}
+			}
+			// upcs.clear();
+			// upcs.add("B00EYCKOLU");
 
 		} finally {
 			if (ses != null) {
@@ -126,7 +130,6 @@ public class ProductQueryManager {
 	public AmazonProductDAO queryAmazonProduct(String pMarketPlaceId, String pASIN) {
 		AmazonProductDAO product = null;
 		SSessionJdbc ses = getProductManager().getSession();
-		// ses.begin();
 		SQuery<AmazonProductDAO> productQuery = new SQuery<AmazonProductDAO>(AmazonProductDAO.PRODUCT).eq(
 				AmazonProductDAO.MARKETPLACEID, pMarketPlaceId).eq(AmazonProductDAO.ASIN, pASIN);
 		List<AmazonProductDAO> products = ses.query(productQuery);
@@ -137,11 +140,29 @@ public class ProductQueryManager {
 			} else {
 				product = products.get(0);
 			}
-
 		} else {
 			logger.info("product not found for marketPlaceId: {}, ASIN: {}", pMarketPlaceId, pASIN);
 		}
-		// ses.commit();
+		return product;
+	}
+
+	public AmazonProductDAO queryAmazonProductByASIN(String pASIN) {
+		AmazonProductDAO product = null;
+		SSessionJdbc ses = getProductManager().getSession();
+		SQuery<AmazonProductDAO> productQuery = new SQuery<AmazonProductDAO>(AmazonProductDAO.PRODUCT).eq(
+				AmazonProductDAO.ASIN, pASIN);
+		List<AmazonProductDAO> products = ses.query(productQuery);
+		logger.debug("queryAmazonProductByASIN: products returned from query: " + products);
+		if (!products.isEmpty()) {
+			if (products.size() > 1) {
+				logger.warn("queryAmazonProductByASIN: returned multiple products for ASIN: {}", pASIN);
+			} else {
+				product = products.get(0);
+			}
+
+		} else {
+			logger.info("queryAmazonProductByASIN: product not found for ASIN: {}", pASIN);
+		}
 		return product;
 	}
 
@@ -161,7 +182,7 @@ public class ProductQueryManager {
 			ses.begin();
 			List<SRecordGeneric> results = ses
 					.rawQuery(
-							"select row_to_json(t) from (select brand,  upc, id as sku, item_weight as unit_weight, category, tier_pack_1, title, description from kole_products where inventory > 0 limit 5) t;",
+							"select row_to_json(t) from (select brand,  upc, id as sku, inventory, item_weight as unit_weight, category, tier_pack_1, title, description from ds_kole_imports where inventory > 0) t;",
 							true);
 			if (results != null && results.size() > 0) {
 				products = new ArrayList<JSONObject>(results.size());
@@ -174,7 +195,6 @@ public class ProductQueryManager {
 						JSONObject object = new JSONObject(jsonValue);
 						products.add(object);
 					}
-
 				}
 			} else {
 				products = null;

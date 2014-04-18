@@ -12,7 +12,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang.StringUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -68,6 +68,8 @@ public class GetMatchingProductForId {
 	private Date mStartDate = new Date();
 
 	private String mIdType = "UPC";
+
+	private static boolean mRequestsThrottled = false;
 
 	public GetMatchingProductForId(String pId) {
 		createOutputDir();
@@ -180,7 +182,9 @@ public class GetMatchingProductForId {
 		GetMatchingProductForIdResponse response = null;
 		JSONArray productArray = new JSONArray();
 		try {
-
+			if (isRequestsThrottled()) {
+				Thread.sleep(Constants.THROTTLE_MS_GET_MATCHING_PRODUCT_FOR_ID);
+			}
 			response = service.getMatchingProductForId(request);
 			logger.debug("GetMatchingProductForId Action Response");
 			List<GetMatchingProductForIdResult> getMatchingProductForIdResultList = response
@@ -295,7 +299,7 @@ public class GetMatchingProductForId {
 								CompetitivePriceList competitivePrices = competitivePricing.getCompetitivePrices();
 								java.util.List<CompetitivePriceType> competitivePriceList = competitivePrices
 										.getCompetitivePrice();
-								logger.info("competitivePriceList: " + competitivePriceList);
+								// logger.info("competitivePriceList: " + competitivePriceList);
 								for (CompetitivePriceType competitivePrice : competitivePriceList) {
 									if (competitivePrice.isSetCondition()) {
 									}
@@ -494,6 +498,11 @@ public class GetMatchingProductForId {
 			logger.error("Request ID: " + ex.getRequestId());
 			logger.error("XML: " + ex.getXML());
 			logger.error("ResponseHeaderMetadata: " + ex.getResponseHeaderMetadata());
+			if (ex.getErrorCode().equals("RequestThrottled")) {
+				setRequestsThrottled(true);
+			}
+		} catch (InterruptedException e) {
+			logger.error("InterruptedException putting thread to sleep when throttling", e);
 		}
 		return productArray;
 	}
@@ -548,6 +557,14 @@ public class GetMatchingProductForId {
 
 	public void setIdType(String pIdType) {
 		mIdType = pIdType;
+	}
+
+	public static boolean isRequestsThrottled() {
+		return mRequestsThrottled;
+	}
+
+	public static void setRequestsThrottled(boolean pRequestsThrottled) {
+		mRequestsThrottled = pRequestsThrottled;
 	}
 
 }
