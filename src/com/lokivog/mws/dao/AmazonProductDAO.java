@@ -61,7 +61,7 @@ public class AmazonProductDAO extends SRecordInstance {
 	public static final SFieldString LANGUAGES = new SFieldString(PRODUCT, "LANGUAGES", 40);
 	public static final SFieldString PUBLICATIONDATE = new SFieldString(PRODUCT, "PUBLICATIONDATE", 40);
 	public static final SFieldString ManufacturerPartsWarrantyDescription = new SFieldString(PRODUCT,
-			"ManPartsWarrantyDesc", 40);
+			"MANPARTSWARRANTYDESC", 40);
 	public static final SFieldString FORMAT = new SFieldString(PRODUCT, "FORMAT", 40);
 	public static final SFieldBooleanChar ISADULTPRODUCT = new SFieldBooleanChar(PRODUCT, "ISADULTPRODUCT", "true",
 			"false");

@@ -6,7 +6,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -123,8 +122,8 @@ public class ProductMain {
 		String defaultLocalJSONFile = "output/json";
 		String defaultJSONLoadType = JSON_LOAD_TYPE.LOCAL.getValue();
 
-		boolean update = true;
-		boolean ignoreRecentlyProcessed = false;
+		boolean update = false;
+		boolean ignoreRecentlyProcessed = true;
 
 		// TODO allow override args to be passed in via command line args
 		String processType = defaultProcessType;
@@ -215,7 +214,9 @@ public class ProductMain {
 					}
 					case DATABASE: {
 						ProductQueryManager pqm = new ProductQueryManager(pm);
-						ids = pqm.queryProductIdsToUpdate(new Date(), pIdType);
+						// ids = pqm.queryProductIdsToUpdate(new Date(), pIdType);
+						// ids = pqm.querySellerProducts();
+						ids = pqm.queryKoleProducts();
 						logger.info("Ids : " + ids);
 						break;
 					}

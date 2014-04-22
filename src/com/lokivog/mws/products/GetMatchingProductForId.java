@@ -491,15 +491,17 @@ public class GetMatchingProductForId {
 			}
 
 		} catch (MarketplaceWebServiceProductsException ex) {
-			logger.error("Caught Exception: " + ex.getMessage());
-			logger.error("Response Status Code: " + ex.getStatusCode());
-			logger.error("Error Code: " + ex.getErrorCode());
-			logger.error("Error Type: " + ex.getErrorType());
-			logger.error("Request ID: " + ex.getRequestId());
-			logger.error("XML: " + ex.getXML());
-			logger.error("ResponseHeaderMetadata: " + ex.getResponseHeaderMetadata());
-			if (ex.getErrorCode().equals("RequestThrottled")) {
-				setRequestsThrottled(true);
+			logger.error("Caught Exception: ", ex.getMessage());
+			logger.error("Response Status Code: {}", ex.getStatusCode());
+			logger.error("Error Code: {}", ex.getErrorCode());
+			logger.error("Error Type: {}", ex.getErrorType());
+			logger.error("Request ID: {}", ex.getRequestId());
+			logger.error("XML: {}", ex.getXML());
+			logger.error("ResponseHeaderMetadata: {}", ex.getResponseHeaderMetadata());
+			if (ex.getErrorCode() != null) {
+				if (ex.getErrorCode().equals("RequestThrottled")) {
+					setRequestsThrottled(true);
+				}
 			}
 		} catch (InterruptedException e) {
 			logger.error("InterruptedException putting thread to sleep when throttling", e);

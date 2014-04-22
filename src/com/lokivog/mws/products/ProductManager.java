@@ -222,7 +222,8 @@ public class ProductManager extends DAOManager {
 									productRow.setObject(field, feature);
 								}
 							} else if (name.equalsIgnoreCase("ManufacturerPartsWarrantyDescription")) {
-								if (auditProductChanges(isNewRow, asin, upcId, jsonValue, name, productRow)) {
+								if (auditProductChanges(isNewRow, asin, upcId, jsonValue, "MANPARTSWARRANTYDESC",
+										productRow)) {
 									productRow.setString(AmazonProductDAO.ManufacturerPartsWarrantyDescription,
 											jsonProduct.getString(name));
 								}
@@ -438,6 +439,7 @@ public class ProductManager extends DAOManager {
 				if (sellerProduct.isNewRow()) {
 					sellerProduct.setDate(SellerProductDAO.CREATION_DATE, now);
 				}
+				sellerProduct.setDate(SellerProductDAO.LAST_UPDATED, now);
 				sellerProduct.setDate(SellerProductDAO.UPLOADED_DATE, now);
 				logger.debug("adding seller product: {}", sellerProduct);
 			}

@@ -16,6 +16,7 @@ import simpleorm.dataset.SRecordInstance;
 import simpleorm.sessionjdbc.SSessionJdbc;
 
 import com.lokivog.mws.dao.AmazonProductDAO;
+import com.lokivog.mws.dao.SellerProductDAO;
 
 /**
  * The Class ProductQueryManager is a utility class for performing DAO queries.
@@ -97,7 +98,7 @@ public class ProductQueryManager {
 				// query = "select distinct(upc) as upc from amz_product where last_updated < '2014-04-17 01:20:05.629' and batch_job < 4";
 				query = "select distinct(upc) as upc from amz_product where batch_job < 4";
 			} else if (pIdType.equals("ASIN")) {
-				query = "select asin from amz_product where last_updated < '2014-04-17 01:20:05.629' and batch_job < 2";
+				query = "select asin from amz_product where last_updated < '2014-04-19 01:20:05.629'";
 			}
 			if (query != null) {
 				ses.begin();
@@ -182,7 +183,7 @@ public class ProductQueryManager {
 			ses.begin();
 			List<SRecordGeneric> results = ses
 					.rawQuery(
-							"select row_to_json(t) from (select brand,  upc, id as sku, inventory, item_weight as unit_weight, category, tier_pack_1, title, description from ds_kole_imports where inventory > 0) t;",
+							"select row_to_json(t) from (select brand,  upc, id as sku, inventory, item_weight as unit_weight, category, tier_pack_1, title, description from ds_kole_imports where inventory > 0 limit 1) t;",
 							true);
 			if (results != null && results.size() > 0) {
 				products = new ArrayList<JSONObject>(results.size());
@@ -207,6 +208,62 @@ public class ProductQueryManager {
 		}
 		return products;
 
+	}
+
+	public List<String> queryKoleProducts() {
+		List<String> products;
+		SSessionJdbc ses = getProductManager().getSession();
+		try {
+			ses.begin();
+			List<SRecordGeneric> results = ses.rawQuery("select upc from ds_kole_imports where inventory > 0", true);
+			if (results != null && results.size() > 0) {
+				products = new ArrayList<String>(results.size());
+				for (SRecordGeneric record : results) {
+					Iterator<String> iter = record.keySet().iterator();
+					while (iter.hasNext()) {
+						String key = iter.next();
+						String value = (String) record.get(key);
+						products.add(value);
+					}
+				}
+			} else {
+				products = null;
+			}
+
+		} finally {
+			if (ses != null) {
+				ses.commit();
+			}
+		}
+		return products;
+
+	}
+
+	public List<String> querySellerProducts() {
+		boolean success = false;
+		List<String> asinIds = null;
+		SSessionJdbc ses = getProductManager().getSession();
+		try {
+			ses.begin();
+			SQuery<SellerProductDAO> productQuery = new SQuery<SellerProductDAO>(SellerProductDAO.SELLER_PRODUCT);
+			List<SellerProductDAO> products = ses.query(productQuery);
+			asinIds = new ArrayList<String>(products.size());
+			logger.debug("products returned from query: " + products);
+			if (!products.isEmpty()) {
+				for (SellerProductDAO product : products) {
+					asinIds.add(product.getString(SellerProductDAO.ASIN));
+				}
+			} else {
+				logger.info("seller products not found");
+			}
+		} finally {
+			if (success) {
+				ses.commit();
+			} else {
+				ses.rollback();
+			}
+		}
+		return asinIds;
 	}
 
 	public void printQueryResults(List<SRecordGeneric> results) {
