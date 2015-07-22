@@ -67,6 +67,7 @@ public class GetMatchingProductForId {
 
 	private Date mStartDate = new Date();
 
+	// private String mIdType = "UPC";
 	private String mIdType = "UPC";
 
 	private static boolean mRequestsThrottled = false;
@@ -139,14 +140,18 @@ public class GetMatchingProductForId {
 	 */
 	public static void main(String... args) {
 		List<String> ids = new ArrayList<String>();
-		ids.add("731015140640");
-		ids.add("633040306001");
+		ids.add("691374334695");
+		// ids.add("5250T");
+		// ids.add("15218640");
+		// ids.add("5250T~B11530087");
+		// ids.add("B11530087");
+		// ids.add("39001SAMSILL");
 		GetMatchingProductForId matchingProductForId = new GetMatchingProductForId(ids);
-		matchingProductForId.test();
+		System.out.println("product: " + matchingProductForId.test());
 	}
 
-	public void test() {
-		matchProducts();
+	public Object test() {
+		return matchProducts();
 		// List<GetMatchingProductForIdResult> matchingProductForIdResultList = response
 		// .getGetMatchingProductForIdResult();
 		// logger.info(response.toJSON());

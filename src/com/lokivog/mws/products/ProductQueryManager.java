@@ -65,9 +65,12 @@ public class ProductQueryManager {
 					logger.warn(
 							"Found multiple products for UPC: {},  QUANTITY: {}, DROPSHIP: {}, products returned: {}, returning product with matching partnumber: {}. Must investigate",
 							pUPC, pPackageQuantity, pDropShipSource, products.size(), pSkuId);
+
 					for (SRecordInstance instance : products) {
 						AmazonProductDAO product = (AmazonProductDAO) instance;
+						logger.info("asin: " + product.getString(AmazonProductDAO.ASIN));
 						if (pSkuId.equals(product.getString(AmazonProductDAO.PARTNUMBER))) {
+							logger.info("asin: " + product.getString(AmazonProductDAO.ASIN));
 							jsonObject = new JSONObject();
 							jsonObject.put("productGroup", product.getString(AmazonProductDAO.PRODUCTGROUP));
 							jsonObject.put("asin", product.getString(AmazonProductDAO.ASIN));

@@ -26,6 +26,7 @@ import com.lokivog.mws.Constants;
 import com.lokivog.mws.MWSUtils;
 import com.lokivog.mws.config.StandaloneConfiguration;
 import com.lokivog.mws.dao.AmazonProductDAO;
+import com.lokivog.mws.dao.SellerProductDAO;
 
 /**
  * The Class ProductMain is the main class for running AmazonMWSToDB.
@@ -111,9 +112,9 @@ public class ProductMain {
 		String defaultProcessType = PROCESS_TYPE.IDS.getValue();
 		// String defaultProcessType = PROCESS_TYPE.SELLER_PRODUCTS.getValue();
 		// String defaultProcessType = PROCESS_TYPE.JSON.getValue();
-		String defaultIdLoadType = ID_LOAD_TYPE.DATABASE.getValue();
+		// String defaultIdLoadType = ID_LOAD_TYPE.DATABASE.getValue();
 		// String defaultIdLoadType = ID_LOAD_TYPE.INLINE_IDS.getValue();
-		// String defaultIdLoadType = ID_LOAD_TYPE.TXT_FILE.getValue();
+		String defaultIdLoadType = ID_LOAD_TYPE.TXT_FILE.getValue();
 		String defaultIdType = "UPC"; // values are UPC or ASIN
 		// String defaultIdType = "ASIN";
 		String defaultDropShipSource = Constants.DROP_SHIP_SOURCE_kOLE;
@@ -149,9 +150,10 @@ public class ProductMain {
 		try {
 			pm = new ProductManager(ProductScheduler.class.getSimpleName(), Constants.DROP_SHIP_SOURCE_kOLE);
 			if (pm.initDBConnection()) {
+				pm.dropTables(SellerProductDAO.SELLER_PRODUCT);
 				pm.dropTables(ProductManager.TABLES);
 				pm.createTables(ProductManager.TABLES);
-				// pm.createTables(SellerProductDAO.SELLER_PRODUCT);
+				pm.createTables(SellerProductDAO.SELLER_PRODUCT);
 			}
 		} finally {
 			if (pm != null) {

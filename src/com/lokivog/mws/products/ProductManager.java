@@ -46,8 +46,7 @@ public class ProductManager extends DAOManager {
 
 	public static final Set<String> IMMUTABLE_FIELDS = new HashSet<String>(Arrays.asList(ASIN, UPC, MARKET_PLACE_ID));
 
-	public static final SRecordMeta<?>[] TABLES = { AmazonProductDAO.PRODUCT, AmazonProductErrorDAO.PRODUCT_ERROR,
-			SellerProductDAO.SELLER_PRODUCT };
+	public static final SRecordMeta<?>[] TABLES = { AmazonProductDAO.PRODUCT, AmazonProductErrorDAO.PRODUCT_ERROR };
 	final Logger logger = LoggerFactory.getLogger(ProductManager.class);
 
 	private ProductQueryManager mProductQueryManager;
@@ -430,12 +429,15 @@ public class ProductManager extends DAOManager {
 				String marketPlaceId = jsonObject.getString(MARKET_PLACE_ID);
 				String asin = jsonObject.getString(ASIN);
 				String upc = jsonObject.getString(UPC);
+				String id = jsonObject.getString("id");
 				int inventory = jsonObject.getInt("inventory");
 				Integer packageQauntity = jsonObject.getInt(Constants.PACKAGE_QUANTITY);
 				SellerProductDAO sellerProduct = ses.findOrCreate(SellerProductDAO.SELLER_PRODUCT, marketPlaceId, asin);
 				sellerProduct.setString(SellerProductDAO.UPC, upc);
 				sellerProduct.setInt(SellerProductDAO.PACKAGEQUANTITY, packageQauntity);
 				sellerProduct.setInt(SellerProductDAO.INVENTORY, inventory);
+				sellerProduct.setString(SellerProductDAO.DROPSHIP_ID, id);
+				sellerProduct.setBoolean(SellerProductDAO.ACTIVE, true);
 				if (sellerProduct.isNewRow()) {
 					sellerProduct.setDate(SellerProductDAO.CREATION_DATE, now);
 				}

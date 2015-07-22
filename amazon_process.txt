@@ -1,0 +1,12 @@
+Update our seller products
+Update ds_kole_imports
+
+deactive product process
+Update kole products
+query seller products whose inventory is no longer in stock due to kole product update
+build amazon xml feed to set inventory
+deactive any producst that are no longer in stock
+update seller products with newest inventory
+
+
+5103 raligh lagrance

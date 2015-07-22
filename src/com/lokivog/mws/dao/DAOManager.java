@@ -148,6 +148,29 @@ public class DAOManager {
 		}
 	}
 
+	public void dropTables(SRecordMeta<?> pTable) {
+		SSessionJdbc ses = getSession();
+		boolean success = false;
+		try {
+			ses.begin();
+			String tableName = pTable.getTableName();
+			ses.getDriver().dropTableNoError(tableName);
+			logger.info("Drop table: {}", tableName);
+			success = true;
+		} finally {
+			try {
+				if (success) {
+					ses.commit();
+				} else {
+					ses.rollback();
+				}
+			} catch (Exception e) {
+				logger.error("error ending transaction", e);
+			}
+
+		}
+	}
+
 	public SSessionJdbc getSession() {
 		SSessionJdbc ses = SSessionJdbc.getThreadLocalSession();
 		if (ses == null) {

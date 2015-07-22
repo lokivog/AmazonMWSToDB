@@ -1,5 +1,6 @@
 package com.lokivog.mws.dao;
 
+import simpleorm.dataset.SFieldBooleanChar;
 import simpleorm.dataset.SFieldFlags;
 import simpleorm.dataset.SFieldInteger;
 import simpleorm.dataset.SFieldReference;
@@ -32,8 +33,10 @@ public class SellerProductDAO extends SRecordInstance {
 	// public static final SFieldString ASIN = new SFieldString(SELLER_PRODUCT, "ASIN", 40, SFieldFlags.SPRIMARY_KEY);
 	public static final SFieldString DROP_SHIP_SOURCE = new SFieldString(SELLER_PRODUCT, "DROP_SHIP_SOURCE", 40);
 	public static final SFieldString UPC = new SFieldString(SELLER_PRODUCT, "UPC", 40);
+	public static final SFieldString DROPSHIP_ID = new SFieldString(SELLER_PRODUCT, "DROPSHIP_ID", 40);
 	public static final SFieldInteger PACKAGEQUANTITY = new SFieldInteger(SELLER_PRODUCT, "PACKAGEQUANTITY");
 	public static final SFieldInteger INVENTORY = new SFieldInteger(SELLER_PRODUCT, "INVENTORY");
+	public static final SFieldBooleanChar ACTIVE = new SFieldBooleanChar(SELLER_PRODUCT, "ACTIVE", "true", "false");
 	public static final SFieldTimestamp CREATION_DATE = new SFieldTimestamp(SELLER_PRODUCT, "CREATION_DATE");
 	public static final SFieldTimestamp LAST_UPDATED = new SFieldTimestamp(SELLER_PRODUCT, "LAST_UPDATED");
 	public static final SFieldTimestamp UPLOADED_DATE = new SFieldTimestamp(SELLER_PRODUCT, "UPLOADED_DATE");
